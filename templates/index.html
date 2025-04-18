@@ -1,0 +1,383 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Analyzer</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            margin-bottom: 30px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+        }
+        .left-panel {
+            flex: 1;
+        }
+        .right-panel {
+            flex: 1;
+        }
+        h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            padding-left: 5px; /* Added padding to align with boxes */
+        }
+        .upload-container {
+            border: 2px dashed #ccc;
+            padding: 25px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 30px;
+            background-color: #f9f9f9;
+        }
+        .upload-container h2 {
+            margin-top: 0;
+            padding-left: 0; /* Reset padding for centered heading in upload container */
+        }
+        .prompt-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .prompt-button {
+            padding: 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            text-align: center;
+        }
+        .prompt-button:hover {
+            background-color: #45a049;
+        }
+        .prompt-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .output-container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 25px;
+            background-color: #f9f9f9;
+            min-height: 350px;
+        }
+        .answer {
+            background-color: #e6f7ff;
+            border-left: 4px solid #1890ff;
+            border-radius: 4px;
+            padding: 20px;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 150px;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #uploadStatus {
+            margin-top: 15px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+        #uploadButton {
+            padding: 8px 16px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #uploadButton:hover {
+            background-color: #0b7dda;
+        }
+        #initialMessage {
+            text-align: center;
+            padding: 50px 0;
+            color: #666;
+        }
+        /* Added consistent container padding */
+        .section-container {
+            padding: 0 5px;
+        }
+        /* Custom query section */
+        .custom-query-container {
+            margin-top: 30px;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+        .custom-query-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .custom-query-input {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            min-height: 60px;
+        }
+        .custom-query-button {
+            padding: 10px;
+            background-color: #FF9800;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            text-align: center;
+            align-self: flex-start;
+        }
+        .custom-query-button:hover {
+            background-color: #F57C00;
+        }
+        .custom-query-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .or-divider {
+            text-align: center;
+            margin: 15px 0;
+            color: #777;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+<h1>Equity researcher</h1>    
+    <div class="container">
+        <div class="left-panel">
+            <div class="upload-container">
+                <h2>Upload Document</h2>
+                <p>Select a PDF file to upload</p>
+                <input type="file" id="fileInput" accept=".pdf" />
+                <button id="uploadButton">Upload</button>
+                <p id="uploadStatus"></p>
+            </div>
+            
+            <div class="section-container">
+                <h2>Choose Prompt</h2>
+                <div class="prompt-buttons" id="promptButtons">
+                    {% for key, prompt in prompts.items() %}
+                    <button class="prompt-button" data-key="{{ key }}" disabled>{{ key }}</button>
+                    {% endfor %}
+                </div>
+                
+                <div class="or-divider">- OR -</div>
+                
+                <div class="custom-query-container">
+                    <h2>Ask Your Own Question</h2>
+                    <div class="custom-query-form">
+                        <textarea id="customQueryInput" class="custom-query-input" placeholder="Type your question about the document..." disabled></textarea>
+                        <button id="customQueryButton" class="custom-query-button" disabled>Ask Question</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="right-panel">
+            <div class="output-container">
+                <h2>Analysis Results</h2>
+
+                <div id="loadingIndicator" class="loading hidden">
+                    <div class="spinner"></div>
+                </div>
+                <div id="answer" class="answer hidden"></div>
+                <div id="initialMessage">
+                    <p>Upload a document and select a prompt to see results</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.getElementById('fileInput');
+            const uploadButton = document.getElementById('uploadButton');
+            const uploadStatus = document.getElementById('uploadStatus');
+            const promptButtons = document.querySelectorAll('.prompt-button');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const answerContainer = document.getElementById('answer');
+            const initialMessage = document.getElementById('initialMessage');
+            const customQueryInput = document.getElementById('customQueryInput');
+            const customQueryButton = document.getElementById('customQueryButton');
+            
+            // Make sure loading is hidden on page load
+            loadingIndicator.classList.add('hidden');
+            
+            // File upload functionality
+            uploadButton.addEventListener('click', async function() {
+                if (!fileInput.files.length) {
+                    uploadStatus.textContent = 'Please select a file first';
+                    return;
+                }
+                
+                const file = fileInput.files[0];
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                uploadStatus.textContent = 'Uploading...';
+                
+                try {
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        uploadStatus.textContent = result.status;
+                        // Enable prompt buttons after successful upload
+                        enablePromptButtons();
+                        // Enable custom query input after successful upload
+                        enableCustomQuery();
+                    } else {
+                        uploadStatus.textContent = `Error: ${result.error || 'Upload failed'}`;
+                    }
+                } catch (error) {
+                    uploadStatus.textContent = `Error: ${error.message}`;
+                }
+            });
+            
+            // Enable prompt buttons
+            function enablePromptButtons() {
+                promptButtons.forEach(button => {
+                    button.disabled = false;
+                });
+            }
+            
+            // Enable custom query input
+            function enableCustomQuery() {
+                customQueryInput.disabled = false;
+                customQueryButton.disabled = false;
+            }
+            
+            // Handle prompt button clicks
+            promptButtons.forEach(button => {
+                button.addEventListener('click', async function() {
+                    const promptKey = this.getAttribute('data-key');
+                    
+                    // Show loading indicator, hide other elements
+                    initialMessage.classList.add('hidden');
+                    answerContainer.classList.add('hidden');
+                    loadingIndicator.classList.remove('hidden');
+                    
+                    // Create form data for analysis request
+                    const formData = new FormData();
+                    formData.append('prompt_key', promptKey);
+                    
+                    try {
+                        const response = await fetch('/analyze', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const result = await response.json();
+                        
+                        // Hide loading
+                        loadingIndicator.classList.add('hidden');
+                        
+                        if (response.ok) {
+                            // Display answer
+                            if (result.answer) {
+                                answerContainer.textContent = result.answer;
+                                answerContainer.classList.remove('hidden');
+                            }
+                        } else {
+                            answerContainer.textContent = `Error: ${result.error || 'Analysis failed'}`;
+                            answerContainer.classList.remove('hidden');
+                        }
+                    } catch (error) {
+                        loadingIndicator.classList.add('hidden');
+                        answerContainer.classList.remove('hidden');
+                        answerContainer.textContent = `Error: ${error.message}`;
+                    }
+                });
+            });
+            
+            // Handle custom query button click
+            customQueryButton.addEventListener('click', async function() {
+                const query = customQueryInput.value.trim();
+                
+                if (!query) {
+                    answerContainer.textContent = "Please enter a question";
+                    answerContainer.classList.remove('hidden');
+                    initialMessage.classList.add('hidden');
+                    return;
+                }
+                
+                // Show loading indicator, hide other elements
+                initialMessage.classList.add('hidden');
+                answerContainer.classList.add('hidden');
+                loadingIndicator.classList.remove('hidden');
+                
+                // Create form data for custom query request
+                const formData = new FormData();
+                formData.append('custom_query', query);
+                
+                try {
+                    const response = await fetch('/analyze_custom', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    // Hide loading
+                    loadingIndicator.classList.add('hidden');
+                    
+                    if (response.ok) {
+                        // Display answer
+                        if (result.answer) {
+                            answerContainer.textContent = result.answer;
+                            answerContainer.classList.remove('hidden');
+                        }
+                    } else {
+                        answerContainer.textContent = `Error: ${result.error || 'Analysis failed'}`;
+                        answerContainer.classList.remove('hidden');
+                    }
+                } catch (error) {
+                    loadingIndicator.classList.add('hidden');
+                    answerContainer.classList.remove('hidden');
+                    answerContainer.textContent = `Error: ${error.message}`;
+                }
+            });
+        });
+    </script>
+</body>
+</html>

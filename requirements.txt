@@ -7,5 +7,3 @@ numpy
 easyocr
 pdf2image
 jinja2
-os
-fitz

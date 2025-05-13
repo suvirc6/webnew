@@ -6,3 +6,4 @@ PyMuPDF
 numpy
 pdf2image
 jinja2
+python-multipart

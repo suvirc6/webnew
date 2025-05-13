@@ -28,7 +28,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # OpenAI client setup
-client = OpenAI(api_key=openai_key)
+# client = OpenAI(api_key=openai_key)
+client = OpenAI(api_key="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")
 
 # Config
 EMBEDDING_MODEL = "text-embedding-3-small"

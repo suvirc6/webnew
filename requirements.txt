@@ -4,6 +4,5 @@ python-dotenv
 openai
 PyMuPDF
 numpy
-easyocr
 pdf2image
 jinja2

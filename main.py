@@ -10,7 +10,6 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from prompts import prompts
 import tempfile
-import easyocr
 from pdf2image import convert_from_path
 
 # Load environment variables
@@ -38,8 +37,8 @@ CHUNK_OVERLAP = 50
 # Global variable to store the current PDF path
 current_pdf_path = None
 
-# --- Initialize EasyOCR reader ---
-ocr_reader = easyocr.Reader(['en'])  # Initialize the OCR reader with English
+# # --- Initialize EasyOCR reader ---
+# ocr_reader = easyocr.Reader(['en'])  # Initialize the OCR reader with English
 
 # --- Step 1: PDF Parsing with fitz ---
 def extract_pdf_text(pdf_path):
@@ -55,22 +54,22 @@ def extract_pdf_text(pdf_path):
         else:
             raise ValueError("No text found in PDF, falling back to OCR.")
     except Exception as e:
-        # If PyMuPDF fails, fall back to OCR
+        # # If PyMuPDF fails, fall back to OCR
         print(f"Error in extracting text with fitz: {e}")
-        return extract_text_with_ocr(pdf_path)
+        # return extract_text_with_ocr(pdf_path)
 
-# --- Step 2: OCR Extraction ---
-def extract_text_with_ocr(pdf_path):
-    images = convert_from_path(pdf_path)
-    full_text = ""
-    for i, image in enumerate(images):
-        # Convert PIL image to numpy array
-        image_np = np.array(image)
+# # --- Step 2: OCR Extraction ---
+# def extract_text_with_ocr(pdf_path):
+#     images = convert_from_path(pdf_path)
+#     full_text = ""
+#     for i, image in enumerate(images):
+#         # Convert PIL image to numpy array
+#         image_np = np.array(image)
         
-        # Use EasyOCR to extract text
-        text = ocr_reader.readtext(image_np, detail=0)  # Extract text without additional details
-        full_text += f"\n--- Page {i+1} ---\n" + " ".join(text)
-    return full_text
+#         # Use EasyOCR to extract text
+#         text = ocr_reader.readtext(image_np, detail=0)  # Extract text without additional details
+#         full_text += f"\n--- Page {i+1} ---\n" + " ".join(text)
+#     return full_text
 
 # --- Step 3: Chunking logic with overlap ---
 def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):

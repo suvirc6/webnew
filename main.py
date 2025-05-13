@@ -15,6 +15,8 @@ from pdf2image import convert_from_path
 # Load environment variables
 load_dotenv()
 
+openai_key = os.getenv("OPENAI_KEY")
+
 app = FastAPI()
 
 # Create directories if they don't exist
@@ -26,7 +28,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # OpenAI client setup
-client = OpenAI(api_key=os.getenv("OPENAI_KEY"))
+client = OpenAI(api_key=openai_key)
 
 # Config
 EMBEDDING_MODEL = "text-embedding-3-small"

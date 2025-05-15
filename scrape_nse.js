@@ -1,5 +1,10 @@
 const puppeteer = require('puppeteer');
 
+const browser = await puppeteer.launch({
+  executablePath: '/usr/bin/chromium-browser', // or '/usr/bin/chromium'
+  headless: true,
+});
+
 async function scrapeFinancials(tickers) {
   const browser = await puppeteer.launch({
     headless: true,

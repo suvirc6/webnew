@@ -13,7 +13,6 @@ from prompts import prompts
 import uvicorn
 from fastapi import Query
 from typing import List
-from playwright.async_api import async_playwright
 
 from fastapi import FastAPI, Query
 import subprocess

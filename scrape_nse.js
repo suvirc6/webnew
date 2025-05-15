@@ -3,8 +3,8 @@ const puppeteer = require('puppeteer');
 
   async function scrapeFinancials(tickers) {
   const browser = await puppeteer.launch({
-    executablePath: '/usr/bin/chromium-browser',   // Adjust this path if necessary
-    headless: 'old',
+    // executablePath: '/usr/bin/chromium-browser',   // Adjust this path if necessary
+    headless: true,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',

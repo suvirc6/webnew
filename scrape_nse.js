@@ -4,7 +4,7 @@ const puppeteer = require('puppeteer');
   async function scrapeFinancials(tickers) {
   const browser = await puppeteer.launch({
     executablePath: '/snap/bin/chromium',   // Adjust this path if necessary
-    headless: true,
+    headless: false,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',

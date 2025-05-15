@@ -4,7 +4,7 @@ const puppeteer = require('puppeteer');
   async function scrapeFinancials(tickers) {
   const browser = await puppeteer.launch({
     executablePath: '/usr/bin/chromium-browser',   // Adjust this path if necessary
-    headless: true,
+    headless: false,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -38,7 +38,7 @@ const puppeteer = require('puppeteer');
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
       try {
-        await page.waitForSelector('#topFinancialResultsTable', { timeout: 20000 });
+        await page.waitForSelector('#topFinancialResultsTable', { timeout: 10000 });
 
         // Extract only the first row (latest quarter) as JSON
         const latestData = await page.evaluate(() => {

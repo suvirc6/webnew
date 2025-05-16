@@ -3,16 +3,18 @@ const puppeteer = require('puppeteer-core');
 
   async function scrapeFinancials(tickers) {
   const browser = await puppeteer.launch({
-    executablePath: '/snap/bin/chromium',   // Adjust this path if necessary
     headless: true,
+    executablePath: "/usr/bin/chromium",
     args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--disable-features=site-per-process'
-    ]
-  });
+      "--disable-blink-features=AutomationControlled",
+      "--disable-features=IsolateOrigins,site-per-process",
+      `--window-size=${randomInt(1024, 1920)},${randomInt(768, 1080)}`,
+      "--disable-notifications",
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--single-process",
+    ],
+});
 
   try {
     const page = await browser.newPage();

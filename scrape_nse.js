@@ -26,7 +26,7 @@ const puppeteer = require('puppeteer');
     });
 
     // Go to NSE homepage once to get cookies/session
-    await page.goto("https://www.nseindia.com", { waitUntil: 'domcontentloaded' });
+    await page.goto("https://www.nseindia.com", { waitUntil: 'networkidle2' });
     await new Promise(r => setTimeout(r, 3000)); // wait for session cookies
 
     let results = [];

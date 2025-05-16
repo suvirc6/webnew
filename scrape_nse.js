@@ -4,10 +4,12 @@ const puppeteer = require('puppeteer');
   async function scrapeFinancials(tickers) {
   const browser = await puppeteer.launch({
     headless: true,
-    // executablePath: "/snap/bin/chromium",
+    executablePath: "/snap/bin/chromium",
     args: [
-      "--no-sandbox",
-    ],
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-blink-features=AutomationControlled',
+      '--disable-notifications',    ],
 });
 
   try {

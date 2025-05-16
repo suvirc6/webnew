@@ -8,7 +8,6 @@ const puppeteer = require('puppeteer-core');
     args: [
       "--disable-blink-features=AutomationControlled",
       "--disable-features=IsolateOrigins,site-per-process",
-      `--window-size=${randomInt(1024, 1920)},${randomInt(768, 1080)}`,
       "--disable-notifications",
       "--no-sandbox",
       "--disable-setuid-sandbox",

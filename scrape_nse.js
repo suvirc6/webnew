@@ -4,7 +4,7 @@ const puppeteer = require('puppeteer-core');
   async function scrapeFinancials(tickers) {
   const browser = await puppeteer.launch({
     headless: true,
-    executablePath: "/usr/bin/chromium",
+    executablePath: "/usr/bin/chromium-browser",
     args: [
       "--disable-blink-features=AutomationControlled",
       "--disable-features=IsolateOrigins,site-per-process",

@@ -34,6 +34,9 @@ async function scrapeFinancials(tickers) {
     for (const ticker of tickers) {
       const url = `https://www.nseindia.com/get-quotes/equity?symbol=${ticker}`;
       console.log(`Navigating to ${url}`);
+            // Take screenshot for debugging page load issues
+      await page.screenshot({ path: `screenshot-${ticker}.png`, fullPage: true });
+
       await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
       // Take screenshot for debugging page load issues

@@ -3,7 +3,7 @@ const puppeteer = require('puppeteer-extra');
 
   async function scrapeFinancials(tickers) {
   const browser = await puppeteer.launch({
-    headless: false,
+    headless: true,
     executablePath: "/snap/bin/chromium",
     args: [
       "--disable-blink-features=AutomationControlled",

@@ -3,8 +3,8 @@ const puppeteer = require('puppeteer-extra');
 
   async function scrapeFinancials(tickers) {
   const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: "/usr/bin/chromium-browser",
+    headless: false,
+    executablePath: "/snap/bin/chromium",
     args: [
       "--disable-blink-features=AutomationControlled",
       "--disable-features=IsolateOrigins,site-per-process",

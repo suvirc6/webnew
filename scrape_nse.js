@@ -1,16 +1,16 @@
 const puppeteer = require('puppeteer');
 
-
-  async function scrapeFinancials(tickers) {
+async function scrapeFinancials(tickers) {
   const browser = await puppeteer.launch({
     headless: true,
-    executablePath: "/snap/bin/chromium",
+    executablePath: "/usr/bin/chromium-browser",  // keep if using snap chromium; else remove this line
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-blink-features=AutomationControlled',
-      '--disable-notifications',    ],
-});
+      '--disable-notifications',
+    ],
+  });
 
   try {
     const page = await browser.newPage();
@@ -33,7 +33,11 @@ const puppeteer = require('puppeteer');
 
     for (const ticker of tickers) {
       const url = `https://www.nseindia.com/get-quotes/equity?symbol=${ticker}`;
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      console.log(`Navigating to ${url}`);
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+
+      // Take screenshot for debugging page load issues
+      await page.screenshot({ path: `screenshot-${ticker}.png`, fullPage: true });
 
       try {
         await page.waitForSelector('#topFinancialResultsTable', { timeout: 10000 });
@@ -76,29 +80,10 @@ const puppeteer = require('puppeteer');
   }
 }
 
-// function compileToTable(dataArray) {
-//   if (!dataArray || dataArray.length === 0) return {};
-
-//   // Get all variable names (keys) except ticker
-//   const variables = Object.keys(dataArray[0]).filter(k => k !== 'ticker');
-
-//   // Initialize table with each variable as a row
-//   const table = {};
-
-//   for (const variable of variables) {
-//     table[variable] = {};
-//     for (const entry of dataArray) {
-//       table[variable][entry.ticker] = entry[variable] || null;
-//     }
-//   }
-
-//   return table;
-// }
-
 // Export functions for external use
 module.exports = { scrapeFinancials };
 
-// If run directly, parse tickers from CLI args and run
+// Run script with tickers from command line
 if (require.main === module) {
   (async () => {
     const tickers = process.argv.slice(2);
@@ -108,11 +93,7 @@ if (require.main === module) {
     }
     try {
       const data = await scrapeFinancials(tickers);
-      // const table = compileToTable(data);
-      // console.log("Compiled Table Format:");
-      // console.log(JSON.stringify(table, null, 2));
-      console.log(JSON.stringify(data));
-
+      console.log(JSON.stringify(data, null, 2));
     } catch (e) {
       console.error(e);
     }

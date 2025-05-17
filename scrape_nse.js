@@ -3,13 +3,14 @@ const puppeteer = require('puppeteer');
 async function scrapeFinancials(tickers) {
   const browser = await puppeteer.launch({
     headless: true,
-    executablePath: "/usr/bin/chromium-browser",  // keep if using snap chromium; else remove this line
+    executablePath: "/usr/bin/chromium-browser",
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--disable-blink-features=AutomationControlled',
-      '--disable-notifications',
-    ],
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-features=site-per-process'
+    ]
   });
 
   try {
@@ -26,21 +27,14 @@ async function scrapeFinancials(tickers) {
     });
 
     // Go to NSE homepage once to get cookies/session
-    await page.goto("https://www.nseindia.com", { waitUntil: 'networkidle2' });
+    await page.goto("https://www.nseindia.com", { waitUntil: 'domcontentloaded' });
     await new Promise(r => setTimeout(r, 3000)); // wait for session cookies
 
     let results = [];
 
     for (const ticker of tickers) {
       const url = `https://www.nseindia.com/get-quotes/equity?symbol=${ticker}`;
-      console.log(`Navigating to ${url}`);
-            // Take screenshot for debugging page load issues
-      await page.screenshot({ path: `screenshot-${ticker}.png`, fullPage: true });
-
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-
-      // Take screenshot for debugging page load issues
-      await page.screenshot({ path: `screenshot-${ticker}.png`, fullPage: true });
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
       try {
         await page.waitForSelector('#topFinancialResultsTable', { timeout: 10000 });
@@ -83,10 +77,29 @@ async function scrapeFinancials(tickers) {
   }
 }
 
+// function compileToTable(dataArray) {
+//   if (!dataArray || dataArray.length === 0) return {};
+
+//   // Get all variable names (keys) except ticker
+//   const variables = Object.keys(dataArray[0]).filter(k => k !== 'ticker');
+
+//   // Initialize table with each variable as a row
+//   const table = {};
+
+//   for (const variable of variables) {
+//     table[variable] = {};
+//     for (const entry of dataArray) {
+//       table[variable][entry.ticker] = entry[variable] || null;
+//     }
+//   }
+
+//   return table;
+// }
+
 // Export functions for external use
 module.exports = { scrapeFinancials };
 
-// Run script with tickers from command line
+// If run directly, parse tickers from CLI args and run
 if (require.main === module) {
   (async () => {
     const tickers = process.argv.slice(2);
@@ -96,7 +109,11 @@ if (require.main === module) {
     }
     try {
       const data = await scrapeFinancials(tickers);
-      console.log(JSON.stringify(data, null, 2));
+      // const table = compileToTable(data);
+      // console.log("Compiled Table Format:");
+      // console.log(JSON.stringify(table, null, 2));
+      console.log(JSON.stringify(data));
+
     } catch (e) {
       console.error(e);
     }

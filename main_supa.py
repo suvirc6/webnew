@@ -58,18 +58,30 @@ client = OpenAI(api_key=openai_key)
 # --- Config ---
 EMBEDDING_MODEL = "text-embedding-3-small"
 COMPLETION_MODEL = "gpt-4o-mini"
-CHUNK_SIZE = 250
+CHUNK_SIZE = 100
 CHUNK_OVERLAP = 50
 
 # --- Global PDF path tracker ---
 current_pdf_path = None
 
 # --- PDF Text Extraction ---
-def extract_pdf_text(pdf_path: str) -> str:
+def extract_pdf_text(pdf_path: str, batch_size: int = 5) -> str:
     try:
         doc = fitz.open(pdf_path)
-        full_text = "\n\n".join([page.get_text() for page in doc])
+        texts = []
+        total_pages = doc.page_count
+        
+        for start_page in range(0, total_pages, batch_size):
+            batch_texts = []
+            end_page = min(start_page + batch_size, total_pages)
+            for page_num in range(start_page, end_page):
+                page = doc.load_page(page_num)
+                batch_texts.append(page.get_text())
+            # Join the batch and append to texts list
+            texts.append("\n\n".join(batch_texts))
+        
         doc.close()
+        full_text = "\n\n".join(texts)
         if full_text.strip():
             return full_text
         raise ValueError("No text found in PDF.")
@@ -92,7 +104,7 @@ def get_embeddings(texts):
     return [np.array(e.embedding) for e in response.data]
 
 # --- Rank Chunks ---
-def rank_chunks_by_question(chunks, question, top_n=5):
+def rank_chunks_by_question(chunks, question, top_n=10):
     question_embedding = get_embeddings([question])[0]
     chunk_embeddings = get_embeddings(chunks)
     similarities = [

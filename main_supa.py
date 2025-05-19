@@ -104,7 +104,7 @@ def get_embeddings(texts):
     return [np.array(e.embedding) for e in response.data]
 
 # --- Rank Chunks ---
-def rank_chunks_by_question(chunks, question, top_n=10):
+def rank_chunks_by_question(chunks, question, top_n=5):
     question_embedding = get_embeddings([question])[0]
     chunk_embeddings = get_embeddings(chunks)
     similarities = [

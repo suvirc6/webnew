@@ -1,0 +1,30 @@
+[
+  {
+    "ticker": "RELIANCE",
+    "quarter_ended": "31-Mar-2025",
+    "total_income": "1,41,72,400.00",
+    "net_profit_loss": "11,21,700.00",
+    "earnings_per_share": "8.29"
+  },
+  {
+    "ticker": "TCS",
+    "quarter_ended": "31-Mar-2025",
+    "total_income": "65,50,700.00",
+    "net_profit_loss": "12,29,300.00",
+    "earnings_per_share": "33.79"
+  },
+  {
+    "ticker": "HDFCBANK",
+    "quarter_ended": "31-Mar-2025",
+    "total_income": "1,20,26,876.00",
+    "net_profit_loss": "18,83,488.00",
+    "earnings_per_share": "24.62"
+  },
+  {
+    "ticker": "BHARTIARTL",
+    "quarter_ended": "31-Mar-2025",
+    "total_income": "48,36,200.00",
+    "net_profit_loss": "12,47,580.00",
+    "earnings_per_share": "19.02"
+  }
+]

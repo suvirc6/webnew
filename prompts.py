@@ -8,6 +8,7 @@ You are an equity research analyst. Based strictly on the following document sec
 - Management commentary relevant to performance or operations
 
 📝 Instructions:
+- DO NOT CREATE TABLES
 - Write **two well-structured paragraphs**, approximately **100 words each**
 - Do **not** use bullet points or lists
 - Use only information found in the document
@@ -24,6 +25,7 @@ You are an equity research analyst. Based solely on the following text, analyze 
 - Peer comparison or positioning relative to rivals
 
 📝 Instructions:
+- DO NOT CREATE TABLES
 - Write **two narrative paragraphs**, each around **100 words**
 - Avoid bullet points or listing — write in full analysis style
 - Do not add assumptions — only use information in the document
@@ -41,6 +43,7 @@ You are an equity research analyst. From the following document content, summari
 - Extract the relevant table and present the data in a tabular format
 
 📝 Instructions:
+- DO NOT CREATE TABLES
 - Produce **two paragraphs**, each around **100 words**
 - Write in a formal valuation commentary tone
 - Do not list metrics — embed key numbers in sentence structure
@@ -58,6 +61,7 @@ You are an equity research analyst. Identify material investment risks and deliv
 - Factors the market may be mispricing or overlooking
 
 📝 Instructions:
+- DO NOT CREATE TABLES
 - Write exactly **two paragraphs**, ~100 words each
 - Do not use bullet points or numbered lists
 - Use a formal, investment recommendation tone

@@ -60,13 +60,15 @@
             <h2>Peer Comparison</h2>
             <p>Enter NSE tickers (e.g. RELIANCE,TCS,INFY)</p>
             <p> units: INR Lakhs</p>
-            <input type="text" id="tickersInput" placeholder="Enter tickers" style="width: 100%; padding: 0.5rem;" />
-            <button id="fetchPeersButton" style="margin-top: 0.5rem;">Fetch Peers Data</button>
-            <pre id="peersResult" style="background:#f4f4f4; padding:1rem; margin-top:1rem; max-height:300px; overflow:auto;"></pre>
+                <div class="input-group">
+                    <input type="text" id="tickersInput" placeholder="Enter tickers (e.g. TCS, INFY)">
+                    <button id="fetchPeersButton">Fetch Peers</button>
+                    <pre id="peersResult" style="background:#f4f4f4; padding:1rem; margin-top:1rem; max-height:300px; overflow:auto;"></pre>
+                    <script src = "/static/js/peer.js"  defer></script>
+    
+                </div>
         </div>
     </div>
-
-    <script src = "/static/js/peer.js"  defer></script>
 
     <script src="/static/js/main.js" defer></script>
 </body>

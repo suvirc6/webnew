@@ -171,7 +171,7 @@ input[type="file"] {
 
 
 .responsive-table {
-    width: 100%;
+    width: flex;
     border-collapse: collapse;
     font-family: Arial, sans-serif;
     margin-top: 1rem;
@@ -205,5 +205,37 @@ input[type="file"] {
       overflow-x: auto;
       white-space: nowrap;
     }
+  }
+  
+
+  .input-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  
+  #tickersInput {
+    flex: 1 1 300px;
+    min-width: 0;
+    padding: 10px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  
+  #fetchPeersButton {
+    padding: 10px 16px;
+    font-size: 14px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  
+  #fetchPeersButton:hover {
+    background-color: #45a049;
   }
   

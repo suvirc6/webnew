@@ -8,3 +8,4 @@ pdf2image
 jinja2
 python-multipart
 requests
+markdown

@@ -18,9 +18,11 @@ from fastapi import FastAPI, Query
 import subprocess
 import json
 
-
 import requests
 from dotenv import load_dotenv
+import markdown
+
+
 
 load_dotenv()
 
@@ -33,8 +35,6 @@ headers = {
     "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
     "Content-Type": "application/json",
 }
-
-
 
 
 # --- Load environment variables ---
@@ -65,6 +65,9 @@ CHUNK_OVERLAP = 50
 current_pdf_path = None
 
 # --- PDF Text Extraction ---
+def markdown_to_html(md_text: str) -> str:
+    return markdown.markdown(md_text, extensions=['tables'])
+
 def extract_pdf_text(pdf_path: str, batch_size: int = 5) -> str:
     try:
         doc = fitz.open(pdf_path)
@@ -141,9 +144,15 @@ Answer:"""
         model=COMPLETION_MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
-        max_tokens=50
+        max_tokens=300
     )
-    return clean_latex(response.choices[0].message.content.strip())
+    raw_answer = clean_latex(response.choices[0].message.content.strip())
+
+    # If the answer contains a markdown table, convert to HTML
+    if "|" in raw_answer and "-" in raw_answer:
+        return markdown_to_html(raw_answer)
+
+    return raw_answer
 
 # --- Analyze Document Pipeline ---
 def analyze_document(pdf_path: str, question: str):

@@ -58,37 +58,15 @@
 
         <div class="peer-comparison-container" style="margin-top: 2rem;">
             <h2>Peer Comparison</h2>
-            <p>Enter comma-separated tickers (e.g. RELIANCE,TCS,INFY)</p>
+            <p>Enter NSE tickers (e.g. RELIANCE,TCS,INFY)</p>
+            <p> units: INR Lakhs</p>
             <input type="text" id="tickersInput" placeholder="Enter tickers" style="width: 100%; padding: 0.5rem;" />
             <button id="fetchPeersButton" style="margin-top: 0.5rem;">Fetch Peers Data</button>
             <pre id="peersResult" style="background:#f4f4f4; padding:1rem; margin-top:1rem; max-height:300px; overflow:auto;"></pre>
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const fetchPeersButton = document.getElementById('fetchPeersButton');
-            const tickersInput = document.getElementById('tickersInput');
-            const peersResult = document.getElementById('peersResult');
-
-            fetchPeersButton.addEventListener('click', async () => {
-                const tickers = tickersInput.value.trim();
-                if (!tickers) {
-                    alert('Please enter at least one ticker');
-                    return;
-                }
-                peersResult.textContent = "Loading...";
-                try {
-                    const response = await fetch(`/scrape_nse?tickers=${encodeURIComponent(tickers)}`);
-                    if (!response.ok) throw new Error('Network response was not ok');
-                    const data = await response.json();
-                    peersResult.textContent = JSON.stringify(data, null, 2);
-                } catch (err) {
-                    peersResult.textContent = `Error: ${err.message}`;
-                }
-            });
-        });
-    </script>
+    <script src = "/static/js/peer.js"  defer></script>
 
     <script src="/static/js/main.js" defer></script>
 </body>

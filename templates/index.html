@@ -1,95 +1,3 @@
-<!-- templates/index.html
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document Analyzer</title>
-    <link rel="stylesheet" href="/static/css/styles.css" /> 
-    
-</head>
-<body>
-<h1>Equity researcher</h1>    
-    <div class="container">
-        <div class="left-panel">
-            <div class="upload-container">
-                <h2>Upload Document</h2>
-                <p>Select a PDF file to upload</p>
-                <input type="file" id="fileInput" accept=".pdf" />
-                <button id="uploadButton">Upload</button>
-                <p id="uploadStatus"></p>
-            </div>
-            
-            <div class="section-container">
-                <h2>Choose Prompt</h2>
-                <div class="prompt-buttons" id="promptButtons">
-                    {% for key, prompt in prompts.items() %}
-                    <button class="prompt-button" data-key="{{ key }}" disabled>{{ key }}</button>
-                    {% endfor %}
-                </div>
-                
-                <div class="or-divider">- OR -</div>
-                
-                <div class="custom-query-container">
-                    <h2>Ask Your Own Question</h2>
-                    <div class="custom-query-form">
-                        <textarea id="customQueryInput" class="custom-query-input" placeholder="Type your question about the document..." disabled></textarea>
-                        <button id="customQueryButton" class="custom-query-button" disabled>Ask Question</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="right-panel">
-            <div class="output-container">
-                <h2>Analysis Results</h2>
-
-                <div id="loadingIndicator" class="loading hidden">
-                    <div class="spinner"></div>
-                </div>
-                <div id="answer" class="answer hidden"></div>
-                <div id="initialMessage">
-                    <p>Upload a document and select a prompt to see results</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="peer-comparison-container" style="margin-top: 2rem;">
-            <h2>Peer Comparison</h2>
-            <p>Enter comma-separated tickers (e.g. RELIANCE,TCS,INFY)</p>
-            <input type="text" id="tickersInput" placeholder="Enter tickers" style="width: 100%; padding: 0.5rem;"/>
-            <button id="fetchPeersButton" style="margin-top: 0.5rem;">Fetch Peers Data</button>
-            <pre id="peersResult" style="background:#f4f4f4; padding:1rem; margin-top:1rem; max-height:300px; overflow:auto;"></pre>
-        </div>
-        
-        <script>
-        document.getElementById('fetchPeersButton').addEventListener('click', async () => {
-            const tickers = document.getElementById('tickersInput').value.trim();
-            const resultEl = document.getElementById('peersResult');
-            if (!tickers) {
-                alert('Please enter at least one ticker');
-                return;
-            }
-            resultEl.textContent = "Loading...";
-            try {
-                const response = await fetch(`/scrape_nse?tickers=${encodeURIComponent(tickers)}`);
-                if (!response.ok) throw new Error('Network response was not ok');
-                const data = await response.json();
-                resultEl.textContent = JSON.stringify(data, null, 2);
-            } catch (err) {
-                resultEl.textContent = `Error: ${err.message}`;
-            }
-        });
-        </script>
-    </div>
-    
-    
-    <script src="/static/js/main.js" defer></script>
-</body>
-</html> -->
-
-
 <!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
@@ -114,7 +22,7 @@
             </div>
 
             <div class="section-container">
-                <h2>Choose Prompt</h2>
+                <h2>Choose parameter</h2>
                 <div class="prompt-buttons" id="promptButtons">
                     {% for key, prompt in prompts.items() %}
                     <button class="prompt-button" data-key="{{ key }}" disabled>{{ key }}</button>

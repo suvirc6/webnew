@@ -208,16 +208,16 @@ input[type="file"] {
   }
   
 
-  .input-group {
+  .input-row {
     display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 20px;
+    align-items: center;
+    gap: 10px; /* space between input and button */
+    margin-top: 10px;
+    max-width: 600px;
   }
   
   #tickersInput {
-    flex: 1 1 300px;
-    min-width: 0;
+    flex: 1; /* input takes remaining space */
     padding: 10px;
     font-size: 14px;
     border: 1px solid #ccc;
@@ -225,6 +225,7 @@ input[type="file"] {
   }
   
   #fetchPeersButton {
+    white-space: nowrap; /* keeps button text in one line */
     padding: 10px 16px;
     font-size: 14px;
     background-color: #4CAF50;
@@ -232,8 +233,8 @@ input[type="file"] {
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    white-space: nowrap;
   }
+  
   
   #fetchPeersButton:hover {
     background-color: #45a049;

@@ -3,6 +3,7 @@ import tempfile
 from typing import List, Dict
 import re
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor
 
 import fitz  # PyMuPDF
 import markdown

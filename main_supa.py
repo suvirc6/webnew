@@ -217,7 +217,7 @@ import concurrent.futures
 def analyze_documents_enhanced(pdf_paths: List[str], question: str, file_names: List[str] = None):
     steps = ["📄 Extracting text from all PDFs..."]
     
-    # Extract text from all documents
+    # Extract text from all documents (sequential)
     all_documents_text = []
     for i, path in enumerate(pdf_paths):
         pages = extract_pdf_text(path)
@@ -227,44 +227,28 @@ def analyze_documents_enhanced(pdf_paths: List[str], question: str, file_names: 
             'path': path
         })
 
-    # Step 1: Create chunks concurrently
+    # Create chunks sequentially
     all_chunks = []
-
-    def process_page(page, source):
-        page_chunks = create_chunks(page["text"])
-        for chunk in page_chunks:
-            chunk["page_number"] = page["page_number"]
-            chunk["source"] = source
-        return page_chunks
-
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = []
-        for doc in all_documents_text:
-            source = doc["source"]
-            for page in doc["pages"]:
-                futures.append(executor.submit(process_page, page, source))
-        for future in concurrent.futures.as_completed(futures):
-            page_chunks = future.result()
+    for doc in all_documents_text:
+        source = doc["source"]
+        for page in doc["pages"]:
+            page_chunks = create_chunks(page["text"])
+            for chunk in page_chunks:
+                chunk["page_number"] = page["page_number"]
+                chunk["source"] = source
             all_chunks.extend(page_chunks)
 
     steps.append(f"🧠 Calculating embeddings for {len(all_chunks)} chunks...")
 
-    # Step 2: Compute embeddings concurrently for all chunks
-    def embed_chunk(chunk):
+    # Compute embeddings sequentially for all chunks
+    for chunk in all_chunks:
         chunk["embedding"] = get_embedding(chunk["text"])
-        return chunk
-
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        embed_futures = [executor.submit(embed_chunk, chunk) for chunk in all_chunks]
-        # Wait for all to complete and collect results in the same order as all_chunks
-        all_chunks = [f.result() for f in concurrent.futures.as_completed(embed_futures)]
 
     steps.append(f"🔍 Finding top {TOP_K_CHUNKS} most relevant chunks from {len(all_chunks)} total chunks...")
 
-    # Step 3: Get most relevant chunks based on query embedding and chunk embeddings
+    # Compute query embedding and similarities
     try:
         query_embedding = get_embedding(question)
-        # Compute similarity for each chunk (embedding must exist now)
         for chunk in all_chunks:
             chunk["similarity_score"] = float(cosine_similarity([query_embedding], [chunk["embedding"]])[0][0])
         relevant_chunks = sorted(all_chunks, key=lambda x: x["similarity_score"], reverse=True)[:TOP_K_CHUNKS]

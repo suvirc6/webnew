@@ -130,7 +130,7 @@ def get_top_relevant_chunks(chunks: List[Dict], query: str, top_k: int = TOP_K_C
             if "embedding" not in chunk:
                 chunk["embedding"] = get_embedding(chunk["text"])
 
-        similarities = [cosine_similarity([query_embedding], [chunk["embedding"]])[0][0] for chunk in chunks]
+        similarities = [cosine_similarity(query_embedding, [chunk["embedding"]])[0][0] for chunk in chunks]
 
         for i, sim in enumerate(similarities):
             chunks[i]["similarity_score"] = float(sim)

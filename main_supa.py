@@ -202,8 +202,8 @@ Answer:"""
     response = client.chat.completions.create(
         model=COMPLETION_MODEL,
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,
-        max_tokens=200,  # Increased for comprehensive answers
+        temperature=0.1,
+        max_tokens=500,  # Increased for comprehensive answers
     )
     
     raw_answer = clean_latex(response.choices[0].message.content.strip())

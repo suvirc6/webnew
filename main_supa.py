@@ -44,7 +44,7 @@ client = OpenAI(api_key=openai_key)
 COMPLETION_MODEL = "gpt-4o-mini"
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 100
-TOP_K_CHUNKS = 5
+TOP_K_CHUNKS = 10
 
 # --- Store multiple uploaded files paths ---
 uploaded_pdf_paths: List[str] = []
@@ -93,8 +93,6 @@ def create_chunks(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_
             chunks.append(chunk_info)
     return chunks
 
-
-
 def get_embedding(text: str) -> np.ndarray:
     """Get OpenAI embedding for a text chunk"""
     try:
@@ -128,7 +126,7 @@ def get_top_relevant_chunks(chunks: List[Dict], query: str, top_k: int = TOP_K_C
             if "embedding" not in chunk:
                 chunk["embedding"] = get_embedding(chunk["text"])
 
-        similarities = [cosine_similarity([query_embedding], [chunk["embedding"]])[0][0] for chunk in chunks]
+        similarities = [cosine_similarity(query_embedding, chunk["embedding"]) for chunk in chunks]
 
         for i, sim in enumerate(similarities):
             chunks[i]["similarity_score"] = float(sim)
@@ -139,7 +137,6 @@ def get_top_relevant_chunks(chunks: List[Dict], query: str, top_k: int = TOP_K_C
     except Exception as e:
         print(f"Error computing embedding-based similarity: {e}")
         return chunks[:top_k]
-
 
 def clean_latex(text: str) -> str:
     return (
@@ -153,46 +150,25 @@ def clean_latex(text: str) -> str:
             .strip()
     )
 
-def ask_openai_with_chunks(question: str, relevant_chunks: List[Dict], file_names: List[str]) -> str:
-    """Enhanced OpenAI query with chunk-based context"""
+def ask_openai_for_chunk(question: str, chunk: Dict, file_names: List[str]) -> str:
+    """Get response from OpenAI for a single chunk"""
+    doc = chunk.get("source", "UnknownDoc")
+    page = chunk.get("page_number", "?")
     
-    # Prepare context from top chunks
-# Prepare context from top chunks
-    context_parts = []
-    for chunk in relevant_chunks[:TOP_K_CHUNKS]:
-        doc = chunk.get("source", "UnknownDoc")
-        page = chunk.get("page_number", "?")
-        context_parts.append(
-            f"[Source: {doc}, Page: {page}, Relevance: {chunk.get('similarity_score', 0):.3f}]\n{chunk['text']}\n"
-        )
-    
-    context = "\n".join(context_parts)
-    
-    # Create file information
-    file_info = f"Documents analyzed: {', '.join(file_names)}" if file_names else "Multiple documents"
-    
-    prompt = f"""You are a comprehensive financial and business analyst. You have access to content from multiple documents and need to provide a thorough analysis.
+    prompt = f"""You are analyzing a specific section of a document. Provide a focused analysis based solely on this chunk.
 
-{file_info}
+Document: {doc}, Page: {page}
+Relevance Score: {chunk.get('similarity_score', 0):.3f}
 
-IMPORTANT INSTRUCTIONS:
-1. Analyze information from ALL provided chunks
-2. Look for patterns, comparisons, and insights across different sections
-3. If comparing multiple companies, clearly distinguish between them
-4. Provide specific examples and data points from the documents
-5. Create a comprehensive summary that synthesizes information from all sources
-
-Context (Top {len(relevant_chunks)} most relevant sections):
-{context}
+Content:
+{chunk['text']}
 
 Question: {question}
 
-Please provide a detailed analysis that:
-- Uses information from multiple document sections
-- Identifies key insights and patterns
-- Provides specific data points and examples
-- Offers comparative analysis if multiple entities are discussed
-- Concludes with a comprehensive summary
+Provide a specific analysis based on this section only. Focus on:
+- Direct information from this chunk
+- Specific data points or insights
+- How this section relates to the question
 
 Answer:"""
 
@@ -200,7 +176,40 @@ Answer:"""
         model=COMPLETION_MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
-        max_tokens=300,  # Increased for comprehensive answers
+        max_tokens=400,
+    )
+    
+    return clean_latex(response.choices[0].message.content.strip())
+
+def summarize_combined_responses(question: str, chunk_responses: List[str], file_names: List[str]) -> str:
+    """Summarize and synthesize multiple chunk responses"""
+    combined_text = "\n\n---\n\n".join(chunk_responses)
+    
+    file_info = f"Documents analyzed: {', '.join(file_names)}" if file_names else "Multiple documents"
+    
+    prompt = f"""You are a comprehensive analyst. You have received multiple focused analyses of different document sections related to a specific question. Your task is to synthesize these responses into a coherent, comprehensive final answer.
+
+{file_info}
+
+Question: {question}
+
+Individual Section Analyses:
+{combined_text}
+
+Please provide a comprehensive summary that:
+1. Synthesizes information from all sections
+2. Identifies key patterns and insights
+3. Resolves any contradictions or differences
+4. Provides a unified, coherent answer
+5. Highlights the most important findings
+
+Final Comprehensive Answer:"""
+
+    response = client.chat.completions.create(
+        model=COMPLETION_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+        max_tokens=650,
     )
     
     raw_answer = clean_latex(response.choices[0].message.content.strip())
@@ -214,8 +223,8 @@ import concurrent.futures
 
 def analyze_documents_enhanced(pdf_paths: List[str], question: str, file_names: List[str] = None):
     steps = ["📄 Extracting text from all PDFs..."]
-    
-    # Extract text from all documents
+
+    # --- Extract text ---
     all_documents_text = []
     for i, path in enumerate(pdf_paths):
         pages = extract_pdf_text(path)
@@ -225,7 +234,7 @@ def analyze_documents_enhanced(pdf_paths: List[str], question: str, file_names: 
             'path': path
         })
 
-    # Step 1: Create chunks concurrently
+    # --- Chunking ---
     all_chunks = []
 
     def process_page(page, source):
@@ -242,47 +251,67 @@ def analyze_documents_enhanced(pdf_paths: List[str], question: str, file_names: 
             for page in doc["pages"]:
                 futures.append(executor.submit(process_page, page, source))
         for future in concurrent.futures.as_completed(futures):
-            page_chunks = future.result()
-            all_chunks.extend(page_chunks)
+            all_chunks.extend(future.result())
 
     steps.append(f"🧠 Calculating embeddings for {len(all_chunks)} chunks...")
 
-    # Step 2: Compute embeddings concurrently for all chunks
+    # --- Embedding chunks ---
     def embed_chunk(chunk):
         chunk["embedding"] = get_embedding(chunk["text"])
         return chunk
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         embed_futures = [executor.submit(embed_chunk, chunk) for chunk in all_chunks]
-        # Wait for all to complete and collect results in the same order as all_chunks
         all_chunks = [f.result() for f in concurrent.futures.as_completed(embed_futures)]
 
-    steps.append(f"🔍 Finding top {TOP_K_CHUNKS} most relevant chunks from {len(all_chunks)} total chunks...")
+    steps.append("🔍 Finding relevant chunks...")
 
-    # Step 3: Get most relevant chunks based on query embedding and chunk embeddings
     try:
         query_embedding = get_embedding(question)
-        # Compute similarity for each chunk (embedding must exist now)
         for chunk in all_chunks:
-            chunk["similarity_score"] = float(cosine_similarity([query_embedding], [chunk["embedding"]])[0][0])
+            chunk["similarity_score"] = float(cosine_similarity(query_embedding, chunk["embedding"]))
         relevant_chunks = sorted(all_chunks, key=lambda x: x["similarity_score"], reverse=True)[:TOP_K_CHUNKS]
     except Exception as e:
-        print(f"Error computing similarity: {e}")
+        print(f"Similarity error: {e}")
         relevant_chunks = all_chunks[:TOP_K_CHUNKS]
 
-    steps.append("🤖 Generating comprehensive analysis...")
+    file_info = [f"Document_{i+1}" for i in range(len(pdf_paths))]
 
-    answer = ask_openai_with_chunks(question, relevant_chunks, file_names or [])
+    # ✅ If the question is short, just answer from the top 1 chunk
+    if len(question.split()) <= 10:
+        steps.append("⚡ Short question detected — answering from most relevant chunk only")
+        try:
+            top_chunk = relevant_chunks[0]
+            answer = ask_openai_for_chunk(question, top_chunk, file_info)
+        except Exception as e:
+            print(f"Error generating short answer: {e}")
+            answer = "Sorry, an error occurred while processing your question."
+        return {
+            "steps": steps,
+            "answer": answer,
+            "chunks_used": 1,
+            "total_chunks": len(all_chunks)
+        }
 
-    chunk_info = f"📊 Analysis based on {len(relevant_chunks)} most relevant sections"
-    if relevant_chunks:
-        avg_similarity = sum(chunk.get('similarity_score', 0) for chunk in relevant_chunks) / len(relevant_chunks)
-        chunk_info += f" (avg relevance: {avg_similarity:.3f})"
-    steps.append(chunk_info)
+    # 🧠 For longer questions, go through full analysis
+    steps.append("🤖 Getting responses for each of the top chunks...")
+
+    chunk_responses = []
+    for i, chunk in enumerate(relevant_chunks):
+        try:
+            response = ask_openai_for_chunk(question, chunk, file_info)
+            chunk_responses.append(f"Section {i+1} Analysis:\n{response}")
+        except Exception as e:
+            print(f"Error in chunk {i}: {e}")
+            chunk_responses.append(f"Section {i+1} Analysis: Error.")
+
+    steps.append("📝 Summarizing all responses...")
+
+    final_answer = summarize_combined_responses(question, chunk_responses, file_info)
 
     return {
         "steps": steps,
-        "answer": answer,
+        "answer": final_answer,
         "chunks_used": len(relevant_chunks),
         "total_chunks": len(all_chunks)
     }
@@ -380,45 +409,3 @@ async def scrape_nse(tickers: str = Query(..., description="Comma separated tick
             status_code=response.status_code,
             content={"error": "Failed to fetch from Supabase", "details": response.text},
         )
-
-# --- Additional utility endpoint ---
-@app.get("/chunk_stats")
-async def get_chunk_statistics(query: str = Query(..., description="Query to rank relevance")):
-    """Get statistics about uploaded documents and top relevant chunks"""
-    if not uploaded_pdf_paths:
-        return JSONResponse(status_code=400, content={"error": "No documents uploaded yet"})
-    
-    # Step 1: Extract and chunk all documents
-    all_chunks = []
-    for i, path in enumerate(uploaded_pdf_paths):
-        doc_text = extract_pdf_text(path)
-        doc_chunks = create_chunks(doc_text)
-        for chunk in doc_chunks:
-            chunk['source'] = f"Document_{i+1}"
-        all_chunks.extend(doc_chunks)
-
-    # Step 2: Compute top-K relevant chunks
-    top_chunks = get_top_relevant_chunks(all_chunks, query, TOP_K_CHUNKS)
-
-    if not top_chunks:
-        return JSONResponse(status_code=500, content={"error": "Failed to compute top chunks"})
-
-    return {
-        "total_documents": len(uploaded_pdf_paths),
-        "total_chunks": len(all_chunks),
-        "chunk_size": CHUNK_SIZE,
-        "chunk_overlap": CHUNK_OVERLAP,
-        "top_k_chunks": TOP_K_CHUNKS,
-        "first_top_chunk": {
-            "chunk_id": top_chunks[0]["chunk_id"],
-            "similarity_score": top_chunks[0]["similarity_score"],
-            "source": top_chunks[0]["source"],
-            "text": top_chunks[0]["text"][:500]  # Preview first 500 chars
-        },
-        "last_top_chunk": {
-            "chunk_id": top_chunks[-1]["chunk_id"],
-            "similarity_score": top_chunks[-1]["similarity_score"],
-            "source": top_chunks[-1]["source"],
-            "text": top_chunks[-1]["text"][:500]
-        }
-    }

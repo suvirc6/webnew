@@ -1,9 +1,11 @@
 import os
 import tempfile
-from typing import List, Dict
-import re
+from typing import List, Dict, Tuple
 import numpy as np
-from concurrent.futures import ThreadPoolExecutor
+import re
+
+import cv2
+import easyocr
 
 import fitz  # PyMuPDF
 import markdown
@@ -14,6 +16,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from openai import OpenAI
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from prompts import prompts  # Your prompts dictionary
 
@@ -43,9 +47,9 @@ client = OpenAI(api_key=openai_key)
 
 # --- Config ---
 COMPLETION_MODEL = "gpt-4o-mini"
-CHUNK_SIZE = 500
-CHUNK_OVERLAP = 100
-TOP_K_CHUNKS = 20
+CHUNK_SIZE = 500  # Increased for better context
+CHUNK_OVERLAP = 100  # Increased overlap for better continuity
+TOP_K_CHUNKS = 20  # Number of top chunks to use
 
 # --- Store multiple uploaded files paths ---
 uploaded_pdf_paths: List[str] = []
@@ -54,35 +58,55 @@ uploaded_pdf_paths: List[str] = []
 def markdown_to_html(md_text: str) -> str:
     return markdown.markdown(md_text, extensions=["tables"])
 
-def extract_pdf_text(pdf_path: str) -> List[Dict]:
-    """Extracts text from each page along with page number and source. No OCR."""
+def extract_pdf_text(pdf_path: str, enable_ocr: bool = True) -> List[Dict]:
+    """Extracts text from each page along with page number and source"""
     try:
         doc = fitz.open(pdf_path)
+        reader = easyocr.Reader(['en']) if enable_ocr else None
         pages_text = []
+
         for page_num in range(doc.page_count):
             page = doc.load_page(page_num)
             text = page.get_text()
+
+            if not text.strip() and enable_ocr:
+                pix = page.get_pixmap(dpi=300)
+                img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+                if pix.n == 4:
+                    img = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
+                result = reader.readtext(img, detail=0)
+                text = " ".join(result)
+
             pages_text.append({
                 "page_number": page_num + 1,
                 "text": text.strip()
             })
+
         doc.close()
         return pages_text
     except Exception as e:
         print(f"Error extracting PDF text from {pdf_path}: {e}")
         return []
 
+
 def clean_text(text: str) -> str:
+    """Clean and normalize text for better processing"""
+    # Remove excessive whitespace
     text = re.sub(r'\s+', ' ', text)
+    # Remove special characters but keep punctuation
     text = re.sub(r'[^\w\s\.,;:!?()-]', ' ', text)
     return text.strip()
 
 def create_chunks(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[Dict]:
+    """Create overlapping chunks with metadata"""
     words = text.split()
     chunks = []
+    
     for i in range(0, len(words), chunk_size - overlap):
         chunk_words = words[i:i + chunk_size]
         chunk_text = ' '.join(chunk_words)
+        
+        # Add metadata
         chunk_info = {
             'text': clean_text(chunk_text),
             'start_word': i,
@@ -90,13 +114,12 @@ def create_chunks(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_
             'word_count': len(chunk_words),
             'chunk_id': len(chunks)
         }
-        if len(chunk_text.strip()) > 50:
+        
+        # Only add non-empty chunks
+        if len(chunk_text.strip()) > 50:  # Minimum chunk size
             chunks.append(chunk_info)
+    
     return chunks
-
-# ... (rest of your code unchanged, just remove any easyocr imports and references)
-
-
 def get_embedding(text: str) -> np.ndarray:
     """Get OpenAI embedding for a text chunk"""
     try:
@@ -108,15 +131,6 @@ def get_embedding(text: str) -> np.ndarray:
     except Exception as e:
         print(f"Embedding error: {e}")
         return np.zeros(1536)  # Fallback for embedding dimension
-
-def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
-    """Compute cosine similarity between two 1D numpy vectors."""
-    dot_product = np.dot(vec1, vec2)
-    norm1 = np.linalg.norm(vec1)
-    norm2 = np.linalg.norm(vec2)
-    if norm1 == 0 or norm2 == 0:
-        return 0.0
-    return dot_product / (norm1 * norm2)
 
 def get_top_relevant_chunks(chunks: List[Dict], query: str, top_k: int = TOP_K_CHUNKS) -> List[Dict]:
     """Get top K most relevant chunks using OpenAI embeddings + cosine similarity"""
@@ -130,7 +144,7 @@ def get_top_relevant_chunks(chunks: List[Dict], query: str, top_k: int = TOP_K_C
             if "embedding" not in chunk:
                 chunk["embedding"] = get_embedding(chunk["text"])
 
-        similarities = [cosine_similarity(query_embedding, [chunk["embedding"]])[0][0] for chunk in chunks]
+        similarities = [cosine_similarity([query_embedding], [chunk["embedding"]])[0][0] for chunk in chunks]
 
         for i, sim in enumerate(similarities):
             chunks[i]["similarity_score"] = float(sim)
@@ -212,12 +226,12 @@ Answer:"""
         return markdown_to_html(raw_answer)
     return raw_answer
 
-import concurrent.futures
-
 def analyze_documents_enhanced(pdf_paths: List[str], question: str, file_names: List[str] = None):
+    """Enhanced document analysis with chunking and relevance ranking"""
     steps = ["📄 Extracting text from all PDFs..."]
     
-    # Extract text from all documents (sequential)
+    # Extract text from all documents
+# Extract text from all documents
     all_documents_text = []
     for i, path in enumerate(pdf_paths):
         pages = extract_pdf_text(path)
@@ -227,39 +241,28 @@ def analyze_documents_enhanced(pdf_paths: List[str], question: str, file_names: 
             'path': path
         })
 
-    # Create chunks sequentially
+    # Create chunks with page number and source
     all_chunks = []
     for doc in all_documents_text:
-        source = doc["source"]
         for page in doc["pages"]:
             page_chunks = create_chunks(page["text"])
             for chunk in page_chunks:
                 chunk["page_number"] = page["page_number"]
-                chunk["source"] = source
+                chunk["source"] = doc["source"]
             all_chunks.extend(page_chunks)
 
-    steps.append(f"🧠 Calculating embeddings for {len(all_chunks)} chunks...")
-
-    # Compute embeddings sequentially for all chunks
-    for chunk in all_chunks:
-        chunk["embedding"] = get_embedding(chunk["text"])
-
+    
     steps.append(f"🔍 Finding top {TOP_K_CHUNKS} most relevant chunks from {len(all_chunks)} total chunks...")
-
-    # Compute query embedding and similarities
-    try:
-        query_embedding = get_embedding(question)
-        for chunk in all_chunks:
-            chunk["similarity_score"] = float(cosine_similarity([query_embedding], [chunk["embedding"]])[0][0])
-        relevant_chunks = sorted(all_chunks, key=lambda x: x["similarity_score"], reverse=True)[:TOP_K_CHUNKS]
-    except Exception as e:
-        print(f"Error computing similarity: {e}")
-        relevant_chunks = all_chunks[:TOP_K_CHUNKS]
-
+    
+    # Get most relevant chunks
+    relevant_chunks = get_top_relevant_chunks(all_chunks, question, TOP_K_CHUNKS)
+    
     steps.append("🤖 Generating comprehensive analysis...")
-
+    
+    # Generate answer using relevant chunks
     answer = ask_openai_with_chunks(question, relevant_chunks, file_names or [])
-
+    
+    # Add chunk information to steps
     chunk_info = f"📊 Analysis based on {len(relevant_chunks)} most relevant sections"
     if relevant_chunks:
         avg_similarity = sum(chunk.get('similarity_score', 0) for chunk in relevant_chunks) / len(relevant_chunks)

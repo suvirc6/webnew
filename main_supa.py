@@ -44,7 +44,7 @@ client = OpenAI(api_key=openai_key)
 COMPLETION_MODEL = "gpt-4o-mini"
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 100
-TOP_K_CHUNKS = 20
+TOP_K_CHUNKS = 5
 
 # --- Store multiple uploaded files paths ---
 uploaded_pdf_paths: List[str] = []

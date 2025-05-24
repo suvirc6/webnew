@@ -130,10 +130,9 @@ def get_top_relevant_chunks(chunks: List[Dict], query: str, top_k: int = TOP_K_C
             if "embedding" not in chunk:
                 chunk["embedding"] = get_embedding(chunk["text"])
 
-        similarities = [cosine_similarity(query_embedding, [chunk["embedding"]])[0][0] for chunk in chunks]
-
-        for i, sim in enumerate(similarities):
-            chunks[i]["similarity_score"] = float(sim)
+        # Fix here: call cosine_similarity with 1D arrays, no extra brackets
+        for chunk in chunks:
+            chunk["similarity_score"] = cosine_similarity(query_embedding, chunk["embedding"])
 
         top_chunks = sorted(chunks, key=lambda x: x["similarity_score"], reverse=True)[:top_k]
         return top_chunks
@@ -141,6 +140,8 @@ def get_top_relevant_chunks(chunks: List[Dict], query: str, top_k: int = TOP_K_C
     except Exception as e:
         print(f"Error computing embedding-based similarity: {e}")
         return chunks[:top_k]
+
+
 
 
 def clean_latex(text: str) -> str:
@@ -202,7 +203,7 @@ Answer:"""
         model=COMPLETION_MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
-        max_tokens=300,  # Increased for comprehensive answers
+        max_tokens=200,  # Increased for comprehensive answers
     )
     
     raw_answer = clean_latex(response.choices[0].message.content.strip())
@@ -216,7 +217,7 @@ import concurrent.futures
 
 def analyze_documents_enhanced(pdf_paths: List[str], question: str, file_names: List[str] = None):
     steps = ["📄 Extracting text from all PDFs..."]
-    
+
     # Extract text from all documents (sequential)
     all_documents_text = []
     for i, path in enumerate(pdf_paths):
@@ -250,7 +251,7 @@ def analyze_documents_enhanced(pdf_paths: List[str], question: str, file_names: 
     try:
         query_embedding = get_embedding(question)
         for chunk in all_chunks:
-            chunk["similarity_score"] = float(cosine_similarity([query_embedding], [chunk["embedding"]])[0][0])
+            chunk["similarity_score"] = cosine_similarity(query_embedding, chunk["embedding"])
         relevant_chunks = sorted(all_chunks, key=lambda x: x["similarity_score"], reverse=True)[:TOP_K_CHUNKS]
     except Exception as e:
         print(f"Error computing similarity: {e}")

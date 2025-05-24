@@ -1,72 +1,73 @@
 prompts = {
     "Business": """
-You are an equity research analyst. Based strictly on the following document section, write a structured overview of the business. Cover:
+You are an equity research analyst preparing a professional company overview. Using only the information provided in the document, construct a detailed business analysis covering:
 
-- A clear explanation of the company’s business model, key products/services, and its economic engine
-- Major revenue and cost drivers, broken down by segment or geography (if disclosed)
-- Notable recent changes to the business model or structure during the year
-- Management commentary relevant to performance or operations
+- A comprehensive description of the company's business model, value chain, and how it generates revenue
+- Breakdown of key products or services, customer segments, and monetization strategy
+- Major revenue and cost drivers, segmented by geography or product lines (if disclosed)
+- Recent business developments, structural shifts, M&A activity, or strategic pivots during the reporting period
+- Specific management insights related to operational priorities, business outlook, or performance commentary
 
 📝 Instructions:
-- DO NOT CREATE TABLES
-- Write **two well-structured paragraphs**, approximately **100 words each**
-- Do **not** use bullet points or lists
-- Use only information found in the document
-- Mention clearly if any of the above information is missing
-- Cite all your data sources clearly
+- DO NOT USE BULLET POINTS OR TABLES
+- Write **two coherent paragraphs**, each approximately **100–120 words**
+- Maintain a formal, analytical tone — like a brokerage research note
+- Reference **specific page numbers** or document sections for any claims or data
+- If information is missing for any of the requested topics, clearly state it
+- Use **direct citations** (e.g., “as per page 12” or “Management notes on p.8…”)
 """,
 
     "Competition": """
-You are an equity research analyst. Based solely on the following text, analyze the company’s industry dynamics and competitive positioning. Cover:
+You are an equity analyst evaluating competitive dynamics based strictly on the provided document. Provide a structured assessment that includes:
 
-- Overview of the industry landscape and major trends (Porter's Five Forces optional)
-- Competitive advantages (brand, cost leadership, IP, etc.) or vulnerabilities
-- Market share insights, pricing power, and barriers to entry (if mentioned)
-- Peer comparison or positioning relative to rivals
+- Description of the industry landscape and macro/micro trends affecting it
+- Evaluation of the company’s competitive advantages (e.g., cost leadership, intellectual property, scale, brand)
+- Pricing power, customer stickiness, distribution leverage, or network effects — if mentioned
+- Qualitative or quantitative peer comparison, including relative strengths/weaknesses
+- Noted barriers to entry or external threats (e.g., new entrants, substitutes)
 
 📝 Instructions:
-- DO NOT CREATE TABLES
-- Write **two narrative paragraphs**, each around **100 words**
-- Avoid bullet points or listing — write in full analysis style
-- Do not add assumptions — only use information in the document
-- Cite all your data sources clearly
+- DO NOT USE BULLET POINTS OR TABLES
+- Write **two full analytical paragraphs**, each 100–120 words
+- Avoid generic claims — use only document-backed insights
+- Clearly mention **where each insight is sourced** (e.g., “as disclosed on p.14…”)
+- Do not invent context or extrapolate beyond the document
+- If competitive data is missing or vague, highlight that fact clearly
 """,
 
     "Financials": """
-You are an equity research analyst. From the following document content, summarize the company’s valuation and financial analysis. Cover:
+You are an equity research analyst conducting a financial review. Using only the document’s content, analyze:
 
-- Historical performance trends of revenue, EBITDA, and net income (if available)
--  Key financial ratios (e.g., P/E, EV/EBITDA) and their implications
-- Any significant changes in capital structure, liquidity, or cash flow metrics
-- Discuss any forward looking guidance or estimates provided in the document
-- Clearly specify the forecasts based on the document (if available) and any assumptions made
-- Extract the relevant table and present the data in a tabular format
+- Multi-year trends in revenue, EBITDA, margins, and net income — cite exact figures and page references
+- Discussion of profitability drivers, cost controls, or margin compression/expansion
+- Analysis of balance sheet health, liquidity, and capital structure changes during the year
+- Coverage of key ratios (P/E, ROE, ROCE, EV/EBITDA, Debt/Equity) if stated, and what they imply about valuation
+- Guidance, forecasts, or management expectations provided, and any disclosed assumptions behind them
 
 📝 Instructions:
-- DO NOT CREATE TABLES
-- Produce **two paragraphs**, each around **100 words**
-- Write in a formal valuation commentary tone
-- Do not list metrics — embed key numbers in sentence structure
-- Avoid extrapolating — use only the data present
-- Reference page numbers when figures are mentioned
-- Cite all your data sources clearly
+- DO NOT USE TABLES OR BULLET POINTS
+- Write **two precise valuation paragraphs**, around **100–120 words** each
+- Embed all numbers contextually in the prose, not as raw metrics
+- Use **formal financial language**, as in a sell-side earnings note
+- Cite page numbers for all quantitative data or quotes (e.g., “Page 16 notes EBITDA margin was…”)
+- If data is unavailable, state that explicitly and refrain from speculation
 """,
 
     "Risks": """
-You are an equity research analyst. Identify material investment risks and deliver a final investment view. Focus on:
+You are an equity analyst assessing downside factors and concluding with an investment view. Based solely on the document, identify and analyze:
 
-- Operational, regulatory, market, or ESG risks discussed in the document
-- Any mitigating actions or strategies mentioned
-- A final investment recommendation (Buy / Hold / Sell) with brief justification
-- Factors the market may be mispricing or overlooking
+- Key business risks — operational, regulatory, financial, competitive, or ESG-related
+- Mitigation strategies proposed or implied by the company (e.g., hedging, diversification, capex changes)
+- Any litigation, compliance concerns, or macroeconomic exposures mentioned
+- Your final investment stance (Buy / Hold / Sell) with reasoning **only from the document**
+- Discuss risks the market may be undervaluing or overemphasizing, if noted by management
 
 📝 Instructions:
-- DO NOT CREATE TABLES
-- Write exactly **two paragraphs**, ~100 words each
-- Do not use bullet points or numbered lists
-- Use a formal, investment recommendation tone
-- Base your answer only on information found in the document
-- Mention missing data where applicable and cite page numbers if referenced
-- Cite all your data sources clearly
+- DO NOT USE BULLET POINTS OR TABLES
+- Write **two polished analyst-style paragraphs**, each around **100–120 words**
+- Base the recommendation entirely on disclosed information — no outside assumptions
+- Clearly state when critical data is absent or vague (e.g., “No ESG commentary found in the report”)
+- Always include **page numbers** when referencing specific risks, quotes, or figures
+- Tone should reflect a professional investment recommendation
 """
 }

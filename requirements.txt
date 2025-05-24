@@ -9,3 +9,5 @@ jinja2
 python-multipart
 requests
 markdown
+eacyocr
+opencv-python-headless

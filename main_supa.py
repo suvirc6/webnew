@@ -1,34 +1,31 @@
 import os
-import subprocess
 import tempfile
+from typing import List, Dict, Tuple
 import numpy as np
+import re
+
+import cv2
+import easyocr
+
 import fitz  # PyMuPDF
+import markdown
+import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, UploadFile, Form, Request, HTTPException
+from fastapi import FastAPI, File, UploadFile, Request, Form, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from openai import OpenAI
-from prompts import prompts
-import uvicorn
-from fastapi import Query
-from typing import List
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
-from fastapi import FastAPI, Query
-import subprocess
-import json
+from prompts import prompts  # Your prompts dictionary
 
-import requests
-from dotenv import load_dotenv
-import markdown
-
-
-
+# --- Load environment variables ---
 load_dotenv()
-
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
-TABLE_NAME = "financials"  # Change if needed
+TABLE_NAME = "financials"
 
 headers = {
     "apikey": SUPABASE_SERVICE_KEY,
@@ -36,90 +33,131 @@ headers = {
     "Content-Type": "application/json",
 }
 
-
-# --- Load environment variables ---
-load_dotenv()
 openai_key = os.getenv("OPENAI_KEY")
 
 # --- Initialize FastAPI app ---
 app = FastAPI()
-
-# --- Set up directories ---
 os.makedirs("static", exist_ok=True)
 os.makedirs("templates", exist_ok=True)
-
-# --- Mount static files directory for CSS, JS, etc. ---
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# --- OpenAI client setup ---
+# --- OpenAI client ---
 client = OpenAI(api_key=openai_key)
 
 # --- Config ---
-EMBEDDING_MODEL = "text-embedding-3-small"
 COMPLETION_MODEL = "gpt-4o-mini"
-CHUNK_SIZE = 100
-CHUNK_OVERLAP = 50
+CHUNK_SIZE = 500  # Increased for better context
+CHUNK_OVERLAP = 100  # Increased overlap for better continuity
+TOP_K_CHUNKS = 20  # Number of top chunks to use
 
-# --- Global PDF path tracker ---
-current_pdf_path = None
+# --- Store multiple uploaded files paths ---
+uploaded_pdf_paths: List[str] = []
 
-# --- PDF Text Extraction ---
+# --- Enhanced utility functions ---
 def markdown_to_html(md_text: str) -> str:
-    return markdown.markdown(md_text, extensions=['tables'])
+    return markdown.markdown(md_text, extensions=["tables"])
 
-def extract_pdf_text(pdf_path: str, batch_size: int = 5) -> str:
+def extract_pdf_text(pdf_path: str, enable_ocr: bool = True) -> List[Dict]:
+    """Extracts text from each page along with page number and source"""
     try:
         doc = fitz.open(pdf_path)
-        texts = []
-        total_pages = doc.page_count
-        
-        for start_page in range(0, total_pages, batch_size):
-            batch_texts = []
-            end_page = min(start_page + batch_size, total_pages)
-            for page_num in range(start_page, end_page):
-                page = doc.load_page(page_num)
-                batch_texts.append(page.get_text())
-            # Join the batch and append to texts list
-            texts.append("\n\n".join(batch_texts))
-        
-        doc.close()
-        full_text = "\n\n".join(texts)
-        if full_text.strip():
-            return full_text
-        raise ValueError("No text found in PDF.")
-    except Exception as e:
-        print(f"Error extracting PDF text: {e}")
-        return ""
+        reader = easyocr.Reader(['en']) if enable_ocr else None
+        pages_text = []
 
-# --- Chunking Text ---
-def chunk_text(text: str, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
+        for page_num in range(doc.page_count):
+            page = doc.load_page(page_num)
+            text = page.get_text()
+
+            if not text.strip() and enable_ocr:
+                pix = page.get_pixmap(dpi=300)
+                img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+                if pix.n == 4:
+                    img = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
+                result = reader.readtext(img, detail=0)
+                text = " ".join(result)
+
+            pages_text.append({
+                "page_number": page_num + 1,
+                "text": text.strip()
+            })
+
+        doc.close()
+        return pages_text
+    except Exception as e:
+        print(f"Error extracting PDF text from {pdf_path}: {e}")
+        return []
+
+
+def clean_text(text: str) -> str:
+    """Clean and normalize text for better processing"""
+    # Remove excessive whitespace
+    text = re.sub(r'\s+', ' ', text)
+    # Remove special characters but keep punctuation
+    text = re.sub(r'[^\w\s\.,;:!?()-]', ' ', text)
+    return text.strip()
+
+def create_chunks(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[Dict]:
+    """Create overlapping chunks with metadata"""
     words = text.split()
     chunks = []
+    
     for i in range(0, len(words), chunk_size - overlap):
-        chunk = " ".join(words[i:i + chunk_size])
-        chunks.append(chunk)
+        chunk_words = words[i:i + chunk_size]
+        chunk_text = ' '.join(chunk_words)
+        
+        # Add metadata
+        chunk_info = {
+            'text': clean_text(chunk_text),
+            'start_word': i,
+            'end_word': min(i + chunk_size, len(words)),
+            'word_count': len(chunk_words),
+            'chunk_id': len(chunks)
+        }
+        
+        # Only add non-empty chunks
+        if len(chunk_text.strip()) > 50:  # Minimum chunk size
+            chunks.append(chunk_info)
+    
     return chunks
+def get_embedding(text: str) -> np.ndarray:
+    """Get OpenAI embedding for a text chunk"""
+    try:
+        response = client.embeddings.create(
+            input=[text],
+            model="text-embedding-3-small"
+        )
+        return np.array(response.data[0].embedding, dtype=np.float32)
+    except Exception as e:
+        print(f"Embedding error: {e}")
+        return np.zeros(1536)  # Fallback for embedding dimension
 
-# --- Generate Embeddings ---
-def get_embeddings(texts):
-    response = client.embeddings.create(model=EMBEDDING_MODEL, input=texts)
-    return [np.array(e.embedding) for e in response.data]
+def get_top_relevant_chunks(chunks: List[Dict], query: str, top_k: int = TOP_K_CHUNKS) -> List[Dict]:
+    """Get top K most relevant chunks using OpenAI embeddings + cosine similarity"""
+    if not chunks or not query:
+        return []
 
-# --- Rank Chunks ---
-def rank_chunks_by_question(chunks, question, top_n=5):
-    question_embedding = get_embeddings([question])[0]
-    chunk_embeddings = get_embeddings(chunks)
-    similarities = [
-        np.dot(chunk_emb, question_embedding) / 
-        (np.linalg.norm(chunk_emb) * np.linalg.norm(question_embedding))
-        for chunk_emb in chunk_embeddings
-    ]
-    top_indices = np.argsort(similarities)[::-1][:top_n]
-    return [chunks[i] for i in top_indices]
+    try:
+        query_embedding = get_embedding(query)
 
-# --- Clean LaTeX (optional post-processing) ---
-def clean_latex(text):
+        for chunk in chunks:
+            if "embedding" not in chunk:
+                chunk["embedding"] = get_embedding(chunk["text"])
+
+        similarities = [cosine_similarity([query_embedding], [chunk["embedding"]])[0][0] for chunk in chunks]
+
+        for i, sim in enumerate(similarities):
+            chunks[i]["similarity_score"] = float(sim)
+
+        top_chunks = sorted(chunks, key=lambda x: x["similarity_score"], reverse=True)[:top_k]
+        return top_chunks
+
+    except Exception as e:
+        print(f"Error computing embedding-based similarity: {e}")
+        return chunks[:top_k]
+
+
+def clean_latex(text: str) -> str:
     return (
         text.replace("\\[", "")
             .replace("\\]", "")
@@ -131,107 +169,199 @@ def clean_latex(text):
             .strip()
     )
 
-# --- Query OpenAI ---
-def ask_openai(question: str, context: str) -> str:
-    prompt = f"""You are a helpful analyst. Based on the context below, answer the question accurately.
+def ask_openai_with_chunks(question: str, relevant_chunks: List[Dict], file_names: List[str]) -> str:
+    """Enhanced OpenAI query with chunk-based context"""
+    
+    # Prepare context from top chunks
+# Prepare context from top chunks
+    context_parts = []
+    for chunk in relevant_chunks[:TOP_K_CHUNKS]:
+        doc = chunk.get("source", "UnknownDoc")
+        page = chunk.get("page_number", "?")
+        context_parts.append(
+            f"[Source: {doc}, Page: {page}, Relevance: {chunk.get('similarity_score', 0):.3f}]\n{chunk['text']}\n"
+        )
+    
+    context = "\n".join(context_parts)
+    
+    # Create file information
+    file_info = f"Documents analyzed: {', '.join(file_names)}" if file_names else "Multiple documents"
+    
+    prompt = f"""You are a comprehensive financial and business analyst. You have access to content from multiple documents and need to provide a thorough analysis.
 
-Context:
+{file_info}
+
+IMPORTANT INSTRUCTIONS:
+1. Analyze information from ALL provided chunks
+2. Look for patterns, comparisons, and insights across different sections
+3. If comparing multiple companies, clearly distinguish between them
+4. Provide specific examples and data points from the documents
+5. Create a comprehensive summary that synthesizes information from all sources
+
+Context (Top {len(relevant_chunks)} most relevant sections):
 {context}
 
 Question: {question}
+
+Please provide a detailed analysis that:
+- Uses information from multiple document sections
+- Identifies key insights and patterns
+- Provides specific data points and examples
+- Offers comparative analysis if multiple entities are discussed
+- Concludes with a comprehensive summary
+
 Answer:"""
+
     response = client.chat.completions.create(
         model=COMPLETION_MODEL,
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.2,
-        max_tokens=300
+        temperature=0.3,
+        max_tokens=300,  # Increased for comprehensive answers
     )
+    
     raw_answer = clean_latex(response.choices[0].message.content.strip())
-
-    # If the answer contains a markdown table, convert to HTML
+    
+    # Convert markdown tables to html if detected
     if "|" in raw_answer and "-" in raw_answer:
         return markdown_to_html(raw_answer)
-
     return raw_answer
 
-# --- Analyze Document Pipeline ---
-def analyze_document(pdf_path: str, question: str):
-    steps = ["📄 Extracting text from PDF..."]
-    text = extract_pdf_text(pdf_path)
+def analyze_documents_enhanced(pdf_paths: List[str], question: str, file_names: List[str] = None):
+    """Enhanced document analysis with chunking and relevance ranking"""
+    steps = ["📄 Extracting text from all PDFs..."]
     
-    steps.append("✂️ Chunking text...")
-    chunks = chunk_text(text)
+    # Extract text from all documents
+# Extract text from all documents
+    all_documents_text = []
+    for i, path in enumerate(pdf_paths):
+        pages = extract_pdf_text(path)
+        all_documents_text.append({
+            'pages': pages,
+            'source': f"Document_{i+1}",
+            'path': path
+        })
 
-    steps.append("🧠 Retrieving relevant chunks with embeddings...")
-    top_chunks = rank_chunks_by_question(chunks, question, top_n=4)
+    # Create chunks with page number and source
+    all_chunks = []
+    for doc in all_documents_text:
+        for page in doc["pages"]:
+            page_chunks = create_chunks(page["text"])
+            for chunk in page_chunks:
+                chunk["page_number"] = page["page_number"]
+                chunk["source"] = doc["source"]
+            all_chunks.extend(page_chunks)
 
-    steps.append("🤖 Asking OpenAI...")
-    combined_context = "\n\n".join(top_chunks)
-    answer = ask_openai(question, combined_context)
+    
+    steps.append(f"🔍 Finding top {TOP_K_CHUNKS} most relevant chunks from {len(all_chunks)} total chunks...")
+    
+    # Get most relevant chunks
+    relevant_chunks = get_top_relevant_chunks(all_chunks, question, TOP_K_CHUNKS)
+    
+    steps.append("🤖 Generating comprehensive analysis...")
+    
+    # Generate answer using relevant chunks
+    answer = ask_openai_with_chunks(question, relevant_chunks, file_names or [])
+    
+    # Add chunk information to steps
+    chunk_info = f"📊 Analysis based on {len(relevant_chunks)} most relevant sections"
+    if relevant_chunks:
+        avg_similarity = sum(chunk.get('similarity_score', 0) for chunk in relevant_chunks) / len(relevant_chunks)
+        chunk_info += f" (avg relevance: {avg_similarity:.3f})"
+    steps.append(chunk_info)
 
     return {
         "steps": steps,
-        "answer": answer
+        "answer": answer,
+        "chunks_used": len(relevant_chunks),
+        "total_chunks": len(all_chunks)
     }
 
 # --- Routes ---
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request, "prompts": prompts})
 
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    global current_pdf_path
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-    with open(temp_file.name, "wb") as f:
-        f.write(await file.read())
-    current_pdf_path = temp_file.name
-    return {"filename": file.filename, "status": "File uploaded successfully"}
+async def upload_files(files: List[UploadFile] = File(...)):
+    # Clear old uploaded files paths and delete temp files if needed
+    for old_path in uploaded_pdf_paths:
+        try:
+            os.unlink(old_path)
+        except Exception:
+            pass
+    uploaded_pdf_paths.clear()
+
+    # Save new uploaded files to temp files
+    file_names = []
+    for file in files:
+        if not file.filename.lower().endswith(".pdf"):
+            return JSONResponse(status_code=400, content={"error": f"Invalid file type: {file.filename}"})
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        content = await file.read()
+        with open(temp_file.name, "wb") as f:
+            f.write(content)
+        uploaded_pdf_paths.append(temp_file.name)
+        file_names.append(file.filename)
+
+    return {
+        "filenames": file_names, 
+        "status": "Files uploaded successfully",
+        "file_count": len(files)
+    }
 
 @app.post("/analyze")
 async def analyze(prompt_key: str = Form(...), custom_query: str = Form(None)):
-    global current_pdf_path
-    if not current_pdf_path:
-        return {"error": "No document uploaded yet"}
+    if not uploaded_pdf_paths:
+        return JSONResponse(status_code=400, content={"error": "No documents uploaded yet"})
 
     question = custom_query.strip() if custom_query else prompts.get(prompt_key)
     if not question:
-        return {"error": "Invalid or missing query"}
+        return JSONResponse(status_code=400, content={"error": "Invalid or missing query"})
 
-    text = extract_pdf_text(current_pdf_path)
-    chunks = chunk_text(text)
-    top_chunks = rank_chunks_by_question(chunks, question, top_n=4)
-    answer = ask_openai(question, "\n\n".join(top_chunks))
-    return {"answer": answer}
+    # Get file names for context (simplified version)
+    file_names = [f"Document_{i+1}" for i in range(len(uploaded_pdf_paths))]
+    
+    result = analyze_documents_enhanced(uploaded_pdf_paths, question, file_names)
+    return {
+        "answer": result["answer"], 
+        "steps": result["steps"],
+        "chunks_info": {
+            "chunks_used": result["chunks_used"],
+            "total_chunks": result["total_chunks"]
+        }
+    }
 
 @app.post("/analyze_custom")
 async def analyze_custom(custom_query: str = Form(...)):
-    global current_pdf_path
-    if not current_pdf_path:
-        return {"error": "No document uploaded yet"}
+    if not uploaded_pdf_paths:
+        return JSONResponse(status_code=400, content={"error": "No documents uploaded yet"})
     if not custom_query.strip():
-        return {"error": "Custom query cannot be empty"}
+        return JSONResponse(status_code=400, content={"error": "Custom query cannot be empty"})
 
-    text = extract_pdf_text(current_pdf_path)
-    chunks = chunk_text(text)
-    top_chunks = rank_chunks_by_question(chunks, custom_query, top_n=4)
-    answer = ask_openai(custom_query, "\n\n".join(top_chunks))
-    return {"answer": answer}
-
+    # Get file names for context
+    file_names = [f"Document_{i+1}" for i in range(len(uploaded_pdf_paths))]
+    
+    result = analyze_documents_enhanced(uploaded_pdf_paths, custom_query.strip(), file_names)
+    return {
+        "answer": result["answer"], 
+        "steps": result["steps"],
+        "chunks_info": {
+            "chunks_used": result["chunks_used"],
+            "total_chunks": result["total_chunks"]
+        }
+    }
 
 @app.get("/scrape_nse")
 async def scrape_nse(tickers: str = Query(..., description="Comma separated tickers")):
     ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
-
     if not ticker_list:
         return JSONResponse(status_code=400, content={"error": "No valid tickers provided"})
 
-    # Build filter query: e.g. ticker=in.(TCS,INFY)
     in_clause = ",".join(ticker_list)
     supabase_query_url = f"{SUPABASE_URL}/rest/v1/{TABLE_NAME}?ticker=in.({in_clause})"
 
     response = requests.get(supabase_query_url, headers=headers)
-
     if response.status_code == 200:
         return response.json()
     else:
@@ -240,9 +370,44 @@ async def scrape_nse(tickers: str = Query(..., description="Comma separated tick
             content={"error": "Failed to fetch from Supabase", "details": response.text},
         )
 
+# --- Additional utility endpoint ---
+@app.get("/chunk_stats")
+async def get_chunk_statistics(query: str = Query(..., description="Query to rank relevance")):
+    """Get statistics about uploaded documents and top relevant chunks"""
+    if not uploaded_pdf_paths:
+        return JSONResponse(status_code=400, content={"error": "No documents uploaded yet"})
+    
+    # Step 1: Extract and chunk all documents
+    all_chunks = []
+    for i, path in enumerate(uploaded_pdf_paths):
+        doc_text = extract_pdf_text(path)
+        doc_chunks = create_chunks(doc_text)
+        for chunk in doc_chunks:
+            chunk['source'] = f"Document_{i+1}"
+        all_chunks.extend(doc_chunks)
 
-# # --- Run App ---
-# if __name__ == "__main__":
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Step 2: Compute top-K relevant chunks
+    top_chunks = get_top_relevant_chunks(all_chunks, query, TOP_K_CHUNKS)
 
+    if not top_chunks:
+        return JSONResponse(status_code=500, content={"error": "Failed to compute top chunks"})
 
+    return {
+        "total_documents": len(uploaded_pdf_paths),
+        "total_chunks": len(all_chunks),
+        "chunk_size": CHUNK_SIZE,
+        "chunk_overlap": CHUNK_OVERLAP,
+        "top_k_chunks": TOP_K_CHUNKS,
+        "first_top_chunk": {
+            "chunk_id": top_chunks[0]["chunk_id"],
+            "similarity_score": top_chunks[0]["similarity_score"],
+            "source": top_chunks[0]["source"],
+            "text": top_chunks[0]["text"][:500]  # Preview first 500 chars
+        },
+        "last_top_chunk": {
+            "chunk_id": top_chunks[-1]["chunk_id"],
+            "similarity_score": top_chunks[-1]["similarity_score"],
+            "source": top_chunks[-1]["source"],
+            "text": top_chunks[-1]["text"][:500]
+        }
+    }

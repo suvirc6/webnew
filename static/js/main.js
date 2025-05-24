@@ -12,18 +12,42 @@ document.addEventListener('DOMContentLoaded', function() {
     // Make sure loading is hidden on page load
     loadingIndicator.classList.add('hidden');
     
-    // File upload functionality
+    // Show selected files when user selects them
+    fileInput.addEventListener('change', function() {
+        const fileCount = fileInput.files.length;
+        if (fileCount > 0) {
+            const fileNames = Array.from(fileInput.files).map(file => file.name).join(', ');
+            uploadStatus.textContent = `${fileCount} file(s) selected: ${fileNames}`;
+        } else {
+            uploadStatus.textContent = '';
+        }
+    });
+    
+    // File upload functionality - updated for multiple files
     uploadButton.addEventListener('click', async function() {
         if (!fileInput.files.length) {
-            uploadStatus.textContent = 'Please select a file first';
+            uploadStatus.textContent = 'Please select at least one file first';
             return;
         }
         
-        const file = fileInput.files[0];
-        const formData = new FormData();
-        formData.append('file', file);
+        // Validate that all files are PDFs
+        const invalidFiles = Array.from(fileInput.files).filter(file => 
+            !file.name.toLowerCase().endsWith('.pdf')
+        );
         
-        uploadStatus.textContent = 'Uploading...';
+        if (invalidFiles.length > 0) {
+            uploadStatus.textContent = `Invalid file types: ${invalidFiles.map(f => f.name).join(', ')}. Only PDF files are allowed.`;
+            return;
+        }
+        
+        const formData = new FormData();
+        // Append each file with the parameter name 'files' (matching your backend)
+        Array.from(fileInput.files).forEach(file => {
+            formData.append('files', file);
+        });
+        
+        uploadStatus.textContent = `Uploading ${fileInput.files.length} file(s)...`;
+        uploadButton.disabled = true;
         
         try {
             const response = await fetch('/upload', {
@@ -34,16 +58,18 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             
             if (response.ok) {
-                uploadStatus.textContent = result.status;
+                uploadStatus.textContent = `✅ ${result.status} - Files: ${result.filenames.join(', ')}`;
                 // Enable prompt buttons after successful upload
                 enablePromptButtons();
                 // Enable custom query input after successful upload
                 enableCustomQuery();
             } else {
-                uploadStatus.textContent = `Error: ${result.error || 'Upload failed'}`;
+                uploadStatus.textContent = `❌ Error: ${result.error || 'Upload failed'}`;
             }
         } catch (error) {
-            uploadStatus.textContent = `Error: ${error.message}`;
+            uploadStatus.textContent = `❌ Error: ${error.message}`;
+        } finally {
+            uploadButton.disabled = false;
         }
     });
     
@@ -86,9 +112,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 loadingIndicator.classList.add('hidden');
                 
                 if (response.ok) {
-                    // Display answer
+                    // Display answer - use innerHTML to render HTML tables
                     if (result.answer) {
-                        answerContainer.textContent = result.answer;
+                        answerContainer.innerHTML = result.answer;
                         answerContainer.classList.remove('hidden');
                     }
                 } else {
@@ -135,9 +161,9 @@ document.addEventListener('DOMContentLoaded', function() {
             loadingIndicator.classList.add('hidden');
             
             if (response.ok) {
-                // Display answer
+                // Display answer - use innerHTML to render HTML tables
                 if (result.answer) {
-                    answerContainer.textContent = result.answer;
+                    answerContainer.innerHTML = result.answer;
                     answerContainer.classList.remove('hidden');
                 }
             } else {
@@ -149,6 +175,13 @@ document.addEventListener('DOMContentLoaded', function() {
             answerContainer.classList.remove('hidden');
             answerContainer.textContent = `Error: ${error.message}`;
         }
+    });
     
+    // Allow Enter key to submit custom query
+    customQueryInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey && !customQueryButton.disabled) {
+            e.preventDefault();
+            customQueryButton.click();
+        }
     });
 });

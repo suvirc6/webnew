@@ -133,7 +133,7 @@ Answer concisely, citing key facts, figures, and chunk numbers if possible."""
         model=COMPLETION_MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.1,
-        max_tokens=280,
+        max_tokens=300,
     )
 
     final_answer = clean_latex(response.choices[0].message.content.strip())

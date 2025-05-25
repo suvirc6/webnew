@@ -34,7 +34,7 @@ templates = Jinja2Templates(directory="templates")
 client = OpenAI(api_key=openai_key)
 
 COMPLETION_MODEL = "gpt-4o-mini"
-TOP_K_PAGES = 10  # Number of top pages to use
+TOP_K_CHUNKS = 10  # Number of top chunks to use
 uploaded_pdf_paths: List[str] = []
 
 def markdown_to_html(md_text: str) -> str:
@@ -59,6 +59,16 @@ def clean_text(text: str) -> str:
     text = re.sub(r'[^\w\s\.,;:!?()-]', ' ', text)
     return text.strip()
 
+def chunk_text(text: str, max_chunk_size: int = 1000, overlap: int = 100) -> List[str]:
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + max_chunk_size
+        chunk = text[start:end]
+        chunks.append(chunk.strip())
+        start += max_chunk_size - overlap
+    return chunks
+
 def get_embedding(text: str) -> np.ndarray:
     try:
         response = client.embeddings.create(input=[text], model="text-embedding-3-small")
@@ -79,41 +89,35 @@ def clean_latex(text: str) -> str:
     return text.replace("\\[", "").replace("\\]", "").replace("\\(", "").replace("\\)", "").replace("$$", "").replace("\\text{", "").replace("}", "").strip()
 
 def analyze_documents_enhanced(pdf_paths: List[str], question: str, file_names: List[str] = None):
-    steps = ["📄 Extracting text from all PDFs..."]
-    all_documents_text = []
+    steps = ["📄 Extracting and chunking text from all PDFs..."]
+    all_chunks = []
+    
     for i, path in enumerate(pdf_paths):
         pages = extract_pdf_text(path)
-        all_documents_text.append({
-            'pages': pages,
-            'source': f"Document_{i+1}",
-            'path': path
-        })
+        full_text = " ".join([page["text"] for page in pages])
+        cleaned_text = clean_text(full_text)
+        text_chunks = chunk_text(cleaned_text)
 
-    steps.append("🧠 Calculating embeddings for each page...")
-    all_pages = []
-    for doc in all_documents_text:
-        source = doc["source"]
-        for page in doc["pages"]:
-            text_cleaned = clean_text(page["text"])
-            embedding = get_embedding(text_cleaned)
-            all_pages.append({
-                "text": text_cleaned,
-                "page_number": page["page_number"],
-                "source": source,
+        for idx, chunk in enumerate(text_chunks):
+            embedding = get_embedding(chunk)
+            all_chunks.append({
+                "text": chunk,
+                "chunk_number": idx + 1,
+                "source": f"Document_{i+1}",
                 "embedding": embedding
             })
 
-    steps.append("🔍 Finding relevant pages...")
+    steps.append("🧠 Calculating similarity scores...")
     try:
         query_embedding = get_embedding(question)
-        for page in all_pages:
-            page["similarity_score"] = float(cosine_similarity(query_embedding, page["embedding"]))
-        relevant_pages = sorted(all_pages, key=lambda x: x["similarity_score"], reverse=True)[:TOP_K_PAGES]
+        for chunk in all_chunks:
+            chunk["similarity_score"] = float(cosine_similarity(query_embedding, chunk["embedding"]))
+        relevant_chunks = sorted(all_chunks, key=lambda x: x["similarity_score"], reverse=True)[:TOP_K_CHUNKS]
     except Exception as e:
         print(f"Similarity error: {e}")
-        relevant_pages = all_pages[:TOP_K_PAGES]
+        relevant_chunks = all_chunks[:TOP_K_CHUNKS]
 
-    merged_text = "\n\n".join([page["text"] for page in relevant_pages])
+    merged_text = "\n\n".join([chunk["text"] for chunk in relevant_chunks])
 
     prompt = f"""You are an expert assistant helping answer questions from financial documents. Use only the information provided below to answer the question.
 
@@ -123,7 +127,7 @@ Context:
 Question:
 {question}
 
-Answer concisely, citing key facts, figures, and page numbers if possible."""
+Answer concisely, citing key facts, figures, and chunk numbers if possible."""
 
     response = client.chat.completions.create(
         model=COMPLETION_MODEL,
@@ -140,8 +144,8 @@ Answer concisely, citing key facts, figures, and page numbers if possible."""
     return {
         "steps": steps,
         "answer": final_answer,
-        "pages_used": len(relevant_pages),
-        "total_pages": len(all_pages)
+        "chunks_used": len(relevant_chunks),
+        "total_chunks": len(all_chunks)
     }
 
 @app.get("/", response_class=HTMLResponse)
@@ -180,8 +184,8 @@ async def analyze(prompt_key: str = Form(...), custom_query: str = Form(None)):
     return {
         "answer": result["answer"],
         "steps": result["steps"],
-        "pages_used": result["pages_used"],
-        "total_pages": result["total_pages"]
+        "chunks_used": result["chunks_used"],
+        "total_chunks": result["total_chunks"]
     }
 
 @app.post("/analyze_custom")
@@ -195,8 +199,8 @@ async def analyze_custom(custom_query: str = Form(...)):
     return {
         "answer": result["answer"],
         "steps": result["steps"],
-        "pages_used": result["pages_used"],
-        "total_pages": result["total_pages"]
+        "chunks_used": result["chunks_used"],
+        "total_chunks": result["total_chunks"]
     }
 
 @app.get("/scrape_nse")

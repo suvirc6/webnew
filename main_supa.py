@@ -225,13 +225,14 @@ async def generate_report():
         return JSONResponse(status_code=400, content={"error": "No documents uploaded yet"})
     
     # Get the first two prompts from the prompts dict (ordered by insertion)
-    keys = list(prompts.keys())[:3]  # e.g. ["Business", "Competition"]
+    keys = list(prompts.keys())  # e.g. ["Business", "Competition"]
+    selected_keys = [keys[0], keys[2]]  # select prompt 1 and 3
     file_names = [f"Document_{i+1}" for i in range(len(uploaded_pdf_paths))]
     
     doc = Document()
     doc.add_heading("Full Equity Research Report", level=1)
     
-    for key in keys:
+    for key in selected_keys:
         prompt_text = prompts.get(key)
         if not prompt_text:
             continue  # skip if prompt not found

@@ -225,7 +225,7 @@ async def generate_report():
         return JSONResponse(status_code=400, content={"error": "No documents uploaded yet"})
     
     # Get the first two prompts from the prompts dict (ordered by insertion)
-    keys = list(prompts.keys()[:2])  # e.g. ["Business", "Competition"]
+    keys = list(prompts.keys())[:2]  # e.g. ["Business", "Competition"]
     file_names = [f"Document_{i+1}" for i in range(len(uploaded_pdf_paths))]
     
     doc = Document()

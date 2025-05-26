@@ -8,11 +8,12 @@ import markdown
 import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, UploadFile, Request, Form, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from openai import OpenAI
 from prompts import prompts
+from docx import Document
 
 load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -215,3 +216,39 @@ async def scrape_nse(tickers: str = Query(..., description="Comma separated tick
         return response.json()
     else:
         return JSONResponse(status_code=response.status_code, content={"error": "Failed to fetch from Supabase", "details": response.text})
+
+
+
+@app.post("/generate_report")
+async def generate_report():
+    if not uploaded_pdf_paths:
+        return JSONResponse(status_code=400, content={"error": "No documents uploaded yet"})
+    
+    # Get the first two prompts from the prompts dict (ordered by insertion)
+    keys = list(prompts.keys())  # e.g. ["Business", "Competition"]
+    file_names = [f"Document_{i+1}" for i in range(len(uploaded_pdf_paths))]
+    
+    doc = Document()
+    doc.add_heading("Full Equity Research Report", level=1)
+    
+    for key in keys:
+        prompt_text = prompts.get(key)
+        if not prompt_text:
+            continue  # skip if prompt not found
+        
+        # Call your analysis function for each prompt
+        result = analyze_documents_enhanced(uploaded_pdf_paths, prompt_text, file_names)
+        
+        # Add a heading for the prompt section
+        doc.add_heading(key, level=2)
+        # Add the text answer for that section
+        doc.add_paragraph(result["answer"])
+    
+    temp_doc_path = tempfile.NamedTemporaryFile(delete=False, suffix=".docx").name
+    doc.save(temp_doc_path)
+    
+    return FileResponse(
+        path=temp_doc_path,
+        filename="full_equity_report.docx",
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )

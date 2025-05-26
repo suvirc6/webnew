@@ -22,16 +22,33 @@
 
 <body>
     <h1>Equity researcher</h1>
+    <p> Welcome to Finlytic.cloud! </p>
+        <p>Upload PDFs like earnings calls or annual reports to get instant insights.</p>
+        <p>Choose key metrics or generate a full report — saving analysts hours of manual review.</p>
+
     <div class="container">
         <div class="left-panel">
             <div class="upload-container">
-                <h2>Upload Document</h2>
-                <p>Select a PDF file to upload</p>
+                <h2>Upload company pdf</h2>
+                <p>Upload pdfs of earning calls, investor decks, annual reports.</p>
                 <input type="file" id="fileInput" name ="files" accept=".pdf" multiple />
                 <button id="uploadButton">Upload</button>
                 <p id="uploadStatus"></p>
             </div>
 
+            <!-- 👇 New Section: Full Report Generation -->
+            <div class="full-report-container" style="margin-top: 2rem;">
+                <h2>Generate full report</h2>
+                <p>This will compile a comprehensive equity research report based on the document.</p>
+                <button id="generateReportButton" class="custom-query-button" disabled>Generate Full Report</button>
+                <div id="loadingIndicatorfullreport" class="loading hidden">
+                <a id="downloadLink" style="display:none; margin-top: 1rem;">Download Report</a>
+                    <div class="spinner"></div>
+                </div>
+            </div>
+            
+            <div class="or-divider">- OR -</div>
+            
             <div class="section-container">
                 <h2>Choose parameter</h2>
                 <div class="prompt-buttons" id="promptButtons">
@@ -41,7 +58,7 @@
                 </div>
 
                 <div class="or-divider">- OR -</div>
-
+                
                 <div class="custom-query-container">
                     <h2>Ask Your Own Question</h2>
                     <div class="custom-query-form">
@@ -56,7 +73,6 @@
         <div class="right-panel">
             <div class="output-container">
                 <h2>Analysis Results</h2>
-
                 <div id="loadingIndicator" class="loading hidden">
                     <div class="spinner"></div>
                 </div>

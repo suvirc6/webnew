@@ -4,10 +4,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const uploadStatus = document.getElementById('uploadStatus');
     const promptButtons = document.querySelectorAll('.prompt-button');
     const loadingIndicator = document.getElementById('loadingIndicator');
+    const loadingIndicatorfullreport = document.getElementById('loadingIndicatorfullreport');
     const answerContainer = document.getElementById('answer');
     const initialMessage = document.getElementById('initialMessage');
     const customQueryInput = document.getElementById('customQueryInput');
     const customQueryButton = document.getElementById('customQueryButton');
+    const generateReportButton = document.getElementById('generateReportButton');
+    const downloadLink = document.getElementById('downloadLink');
+
+    
+    
+
     
     // Make sure loading is hidden on page load
     loadingIndicator.classList.add('hidden');
@@ -184,4 +191,57 @@ document.addEventListener('DOMContentLoaded', function() {
             customQueryButton.click();
         }
     });
+
+
+
+// Generate report functionality
+function enableGenerateReport() {
+    generateReportButton.disabled = false;
+}
+
+uploadButton.addEventListener('click', () => {
+    // after successful upload inside the try block
+    enableGenerateReport();
 });
+
+generateReportButton.addEventListener('click', async () => {
+    loadingIndicatorfullreport.classList.remove('hidden');
+    answerContainer.classList.add('hidden');
+    downloadLink.style.display = 'none';
+    downloadLink.textContent = '';
+    
+    // Hide only the spinner, not the entire container
+    const spinner = loadingIndicatorfullreport.querySelector('.spinner');
+
+    try {
+        const response = await fetch('/generate_report', { method: 'POST' });
+
+        if (!response.ok) {
+            const error = await response.json();
+            answerContainer.textContent = `Error: ${error.error || "Failed to generate report"}`;
+            answerContainer.classList.remove('hidden');
+            loadingIndicatorfullreport.classList.add('hidden');
+            return;
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        downloadLink.href = url;
+        downloadLink.download = "equity_report_finlytic.docx";
+        downloadLink.textContent = "Download Generated Report";
+        downloadLink.classList.remove('hidden');
+        downloadLink.style.display = 'inline-block';
+        
+        // Hide only the spinner, keep the container visible for the download link
+        if (spinner) spinner.style.display = 'none';
+    } catch (error) {
+        answerContainer.textContent = `Error: ${error.message}`;
+        answerContainer.classList.remove('hidden');
+        loadingIndicatorfullreport.classList.add('hidden');
+    }
+});
+
+});
+
+
+
